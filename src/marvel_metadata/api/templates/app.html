@@ -1,0 +1,1575 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Marvel Comics — Mi Colección</title>
+<style>
+  :root {
+    --bg: #0a0a0a;
+    --bg2: #111;
+    --bg3: #1a1a1a;
+    --bg4: #222;
+    --border: #2a2a2a;
+    --red: #e62429;
+    --red-dark: #a81a1e;
+    --gold: #f0b90b;
+    --text: #f0f0f0;
+    --text2: #aaa;
+    --text3: #666;
+    --green: #2ecc71;
+    --radius: 8px;
+    --shadow: 0 4px 20px rgba(0,0,0,.6);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    font-size: 14px;
+    min-height: 100vh;
+  }
+
+  /* ── HEADER ── */
+  header {
+    background: linear-gradient(135deg, #111 0%, #1a0000 50%, #111 100%);
+    border-bottom: 2px solid var(--red);
+    padding: 0 20px;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    height: 56px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .logo {
+    font-size: 22px;
+    font-weight: 900;
+    letter-spacing: -1px;
+    color: var(--red);
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+  .logo span { color: var(--text); }
+
+  nav { display: flex; gap: 4px; flex: 1; }
+  nav button {
+    background: none;
+    border: none;
+    color: var(--text2);
+    padding: 8px 14px;
+    border-radius: var(--radius);
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 500;
+    transition: all .15s;
+    white-space: nowrap;
+  }
+  nav button:hover { background: var(--bg3); color: var(--text); }
+  nav button.active {
+    background: var(--red);
+    color: #fff;
+    font-weight: 700;
+  }
+
+  .header-right {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-left: auto;
+  }
+  .stats-pill {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 4px 12px;
+    font-size: 12px;
+    color: var(--text2);
+    white-space: nowrap;
+  }
+  .stats-pill strong { color: var(--gold); }
+
+  /* ── LAYOUT ── */
+  main { max-width: 1400px; margin: 0 auto; padding: 24px 20px; }
+
+  .section { display: none; }
+  .section.active { display: block; }
+
+  /* ── SEARCH BAR ── */
+  .search-bar {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 24px;
+  }
+  .search-bar input {
+    flex: 1;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text);
+    padding: 10px 16px;
+    font-size: 15px;
+    outline: none;
+    transition: border-color .15s;
+  }
+  .search-bar input:focus { border-color: var(--red); }
+  .search-bar input::placeholder { color: var(--text3); }
+
+  .filters {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+  }
+  .filters select, .filters input {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text);
+    padding: 8px 12px;
+    font-size: 13px;
+    outline: none;
+    cursor: pointer;
+  }
+  .filters select:focus, .filters input:focus { border-color: var(--red); }
+
+  /* ── GRID ── */
+  .comic-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 16px;
+  }
+
+  .comic-card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    cursor: pointer;
+    transition: transform .15s, border-color .15s, box-shadow .15s;
+    position: relative;
+  }
+  .comic-card:hover {
+    transform: translateY(-4px);
+    border-color: var(--red);
+    box-shadow: var(--shadow);
+  }
+  .comic-card.read { border-color: var(--green); }
+  .comic-card.owned { border-color: var(--gold); }
+
+  .comic-cover {
+    width: 100%;
+    aspect-ratio: 2/3;
+    object-fit: cover;
+    display: block;
+    background: var(--bg3);
+  }
+  .cover-placeholder {
+    width: 100%;
+    aspect-ratio: 2/3;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, var(--bg3), var(--bg4));
+    color: var(--text3);
+    font-size: 32px;
+  }
+
+  .comic-info {
+    padding: 8px 10px;
+  }
+  .comic-title {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text);
+    line-height: 1.3;
+    margin-bottom: 4px;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .comic-meta {
+    font-size: 11px;
+    color: var(--text3);
+  }
+
+  .badge {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 700;
+  }
+  .badge-read { background: var(--green); color: #000; }
+  .badge-owned { background: var(--gold); color: #000; }
+
+  /* ── ISSUE MODAL ── */
+  .modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,.85);
+    z-index: 200;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  }
+  .modal-overlay.open { display: flex; }
+
+  .modal {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    max-width: 680px;
+    width: 100%;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 20px 60px rgba(0,0,0,.8);
+  }
+  .modal-header {
+    display: flex;
+    gap: 20px;
+    padding: 20px;
+    border-bottom: 1px solid var(--border);
+  }
+  .modal-cover {
+    width: 120px;
+    flex-shrink: 0;
+    border-radius: 6px;
+    overflow: hidden;
+  }
+  .modal-cover img { width: 100%; display: block; }
+  .modal-cover .cover-placeholder { width: 120px; height: 180px; font-size: 48px; border-radius: 6px; }
+  .modal-title { font-size: 20px; font-weight: 800; margin-bottom: 6px; line-height: 1.2; }
+  .modal-series { color: var(--red); font-size: 13px; font-weight: 600; margin-bottom: 8px; }
+  .modal-meta { color: var(--text2); font-size: 13px; line-height: 1.6; }
+
+  .modal-body { padding: 20px; }
+  .modal-desc { color: var(--text2); line-height: 1.6; margin-bottom: 16px; font-size: 13px; }
+
+  .modal-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 16px; }
+  .btn {
+    padding: 8px 16px;
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 600;
+    transition: all .15s;
+    background: var(--bg3);
+    color: var(--text);
+  }
+  .btn:hover { background: var(--bg4); }
+  .btn-primary { background: var(--red); border-color: var(--red); color: #fff; }
+  .btn-primary:hover { background: var(--red-dark); border-color: var(--red-dark); }
+  .btn-success { background: var(--green); border-color: var(--green); color: #000; }
+  .btn-gold { background: var(--gold); border-color: var(--gold); color: #000; }
+  .btn-danger { background: #333; border-color: #555; color: #e55; }
+  .btn-danger:hover { background: #500; border-color: #e55; }
+  .btn-sm { padding: 5px 10px; font-size: 12px; }
+
+  .creator-tags { display: flex; gap: 6px; flex-wrap: wrap; }
+  .creator-tag {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 3px 10px;
+    font-size: 11px;
+    color: var(--text2);
+  }
+  .creator-tag .role { color: var(--text3); }
+
+  .modal-close {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    color: var(--text2);
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .modal-close:hover { color: var(--text); background: var(--bg4); }
+
+  /* ── READING ORDERS ── */
+  .orders-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 16px;
+    margin-bottom: 32px;
+  }
+
+  .order-card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 18px;
+    cursor: pointer;
+    transition: border-color .15s, transform .15s;
+  }
+  .order-card:hover { border-color: var(--red); transform: translateY(-2px); }
+  .order-card.curated { border-left: 3px solid var(--red); }
+  .order-card.user-created { border-left: 3px solid var(--gold); }
+
+  .order-name { font-size: 16px; font-weight: 700; margin-bottom: 6px; }
+  .order-desc { color: var(--text2); font-size: 13px; line-height: 1.5; margin-bottom: 12px; }
+  .order-footer { display: flex; align-items: center; justify-content: space-between; }
+  .order-count { font-size: 12px; color: var(--text3); }
+
+  .progress-bar {
+    height: 4px;
+    background: var(--bg4);
+    border-radius: 2px;
+    margin-top: 10px;
+    overflow: hidden;
+  }
+  .progress-fill {
+    height: 100%;
+    background: var(--green);
+    border-radius: 2px;
+    transition: width .3s;
+  }
+  .progress-label { font-size: 11px; color: var(--text3); margin-top: 4px; }
+
+  /* Reading order detail */
+  .order-detail-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+  .back-btn {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    color: var(--text2);
+    padding: 8px 14px;
+    border-radius: var(--radius);
+    cursor: pointer;
+    font-size: 13px;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .back-btn:hover { color: var(--text); background: var(--bg4); }
+
+  .order-items-list { display: flex; flex-direction: column; gap: 4px; }
+  .order-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    transition: border-color .15s;
+  }
+  .order-item:hover { border-color: #444; }
+  .order-item.item-read { border-color: var(--green); background: rgba(46,204,113,.05); }
+
+  .item-num {
+    width: 32px;
+    text-align: center;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--text3);
+    flex-shrink: 0;
+  }
+  .item-check {
+    width: 20px;
+    height: 20px;
+    border: 2px solid var(--border);
+    border-radius: 50%;
+    flex-shrink: 0;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    transition: all .15s;
+  }
+  .item-check.checked { background: var(--green); border-color: var(--green); color: #000; }
+  .item-check:hover { border-color: var(--green); }
+
+  .item-cover-thumb {
+    width: 36px;
+    height: 54px;
+    border-radius: 3px;
+    object-fit: cover;
+    flex-shrink: 0;
+    background: var(--bg3);
+  }
+  .item-cover-placeholder {
+    width: 36px;
+    height: 54px;
+    border-radius: 3px;
+    background: var(--bg3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    flex-shrink: 0;
+    color: var(--text3);
+  }
+
+  .item-info { flex: 1; min-width: 0; }
+  .item-title {
+    font-size: 13px;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .item-note { font-size: 11px; color: var(--text3); margin-top: 2px; }
+  .item-series { font-size: 11px; color: var(--text2); margin-top: 1px; }
+
+  .item-actions { display: flex; gap: 6px; flex-shrink: 0; }
+  .item-link {
+    color: var(--red);
+    font-size: 18px;
+    text-decoration: none;
+    opacity: .7;
+    transition: opacity .15s;
+  }
+  .item-link:hover { opacity: 1; }
+
+  /* ── COLLECTION ── */
+  .collection-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 12px;
+    margin-bottom: 28px;
+  }
+  .stat-card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+    text-align: center;
+  }
+  .stat-number { font-size: 32px; font-weight: 900; color: var(--red); }
+  .stat-label { font-size: 12px; color: var(--text2); margin-top: 4px; }
+
+  /* ── SERIES ── */
+  .series-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 10px;
+  }
+  .series-item {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 12px 16px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    transition: border-color .15s;
+  }
+  .series-item:hover { border-color: var(--red); }
+  .series-name { font-size: 14px; font-weight: 600; }
+  .series-count {
+    background: var(--bg3);
+    border-radius: 20px;
+    padding: 2px 10px;
+    font-size: 12px;
+    color: var(--text3);
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  /* ── PAGINATION ── */
+  .pagination {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 10px;
+    margin-top: 28px;
+  }
+  .pagination button { min-width: 80px; }
+  .page-info { color: var(--text3); font-size: 13px; }
+
+  /* ── LOADING & EMPTY ── */
+  .loading {
+    text-align: center;
+    padding: 60px;
+    color: var(--text3);
+    font-size: 15px;
+  }
+  .loading::before {
+    content: '';
+    display: block;
+    width: 40px;
+    height: 40px;
+    border: 3px solid var(--border);
+    border-top-color: var(--red);
+    border-radius: 50%;
+    margin: 0 auto 16px;
+    animation: spin 1s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .empty {
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--text3);
+  }
+  .empty-icon { font-size: 48px; margin-bottom: 12px; }
+  .empty-title { font-size: 18px; font-weight: 700; color: var(--text2); margin-bottom: 8px; }
+
+  /* ── CREATE ORDER FORM ── */
+  .form-group { margin-bottom: 16px; }
+  .form-label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; color: var(--text2); }
+  .form-input {
+    width: 100%;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text);
+    padding: 10px 14px;
+    font-size: 14px;
+    outline: none;
+    transition: border-color .15s;
+  }
+  .form-input:focus { border-color: var(--red); }
+  textarea.form-input { min-height: 80px; resize: vertical; }
+
+  .create-order-panel {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 24px;
+    margin-bottom: 28px;
+    display: none;
+  }
+  .create-order-panel.open { display: block; }
+
+  .search-results-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    max-height: 300px;
+    overflow-y: auto;
+    z-index: 50;
+    box-shadow: var(--shadow);
+  }
+  .dropdown-item {
+    padding: 10px 14px;
+    cursor: pointer;
+    border-bottom: 1px solid var(--border);
+    transition: background .1s;
+  }
+  .dropdown-item:last-child { border-bottom: none; }
+  .dropdown-item:hover { background: var(--bg3); }
+  .dropdown-item-title { font-size: 13px; font-weight: 600; }
+  .dropdown-item-meta { font-size: 11px; color: var(--text3); margin-top: 2px; }
+
+  .search-wrapper { position: relative; }
+
+  .added-issues { margin-top: 12px; display: flex; flex-direction: column; gap: 6px; max-height: 300px; overflow-y: auto; }
+  .added-issue {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--bg3);
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-size: 13px;
+    gap: 10px;
+  }
+  .added-issue-title { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  /* ── TOAST ── */
+  .toast-container {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    z-index: 999;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .toast {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 12px 16px;
+    font-size: 13px;
+    max-width: 320px;
+    animation: slideIn .2s ease;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    box-shadow: var(--shadow);
+  }
+  .toast.success { border-left: 3px solid var(--green); }
+  .toast.error { border-left: 3px solid var(--red); }
+  @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: none; opacity: 1; } }
+
+  /* ── SECTION TITLE ── */
+  .section-title {
+    font-size: 22px;
+    font-weight: 900;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .section-title small { font-size: 13px; color: var(--text3); font-weight: 400; }
+
+  @media (max-width: 600px) {
+    header { padding: 0 12px; gap: 10px; }
+    .logo { font-size: 16px; }
+    nav button { padding: 6px 10px; font-size: 12px; }
+    .stats-pill { display: none; }
+    main { padding: 16px 12px; }
+    .comic-grid { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">Marvel<span>Comics</span></div>
+  <nav>
+    <button class="active" onclick="showSection('browse')">Explorar</button>
+    <button onclick="showSection('series')">Series</button>
+    <button onclick="showSection('orders')">Órdenes de Lectura</button>
+    <button onclick="showSection('collection')">Mi Colección</button>
+  </nav>
+  <div class="header-right">
+    <div class="stats-pill" id="header-stats">
+      <strong id="hs-read">0</strong> leídos · <strong id="hs-owned">0</strong> colección
+    </div>
+  </div>
+</header>
+
+<main>
+
+  <!-- ── BROWSE ── -->
+  <section class="section active" id="section-browse">
+    <div class="search-bar">
+      <input type="text" id="search-input" placeholder="Buscar cómics... (ej: Avengers, Spider-Man, Hickman)" autocomplete="off"/>
+    </div>
+    <div class="filters">
+      <select id="filter-year" onchange="browseIssues()">
+        <option value="">Todos los años</option>
+      </select>
+      <select id="filter-available" onchange="browseIssues()">
+        <option value="">Disponibilidad</option>
+        <option value="true">En Marvel Unlimited</option>
+        <option value="false">Sin Marvel Unlimited</option>
+      </select>
+    </div>
+    <div id="browse-results"></div>
+    <div class="pagination" id="browse-pagination" style="display:none">
+      <button class="btn" id="prev-btn" onclick="changePage(-1)">← Anterior</button>
+      <span class="page-info" id="page-info"></span>
+      <button class="btn btn-primary" id="next-btn" onclick="changePage(1)">Siguiente →</button>
+    </div>
+  </section>
+
+  <!-- ── SERIES ── -->
+  <section class="section" id="section-series">
+    <div class="section-title">Series <small id="series-total"></small></div>
+    <div class="search-bar">
+      <input type="text" id="series-search" placeholder="Filtrar series..." oninput="filterSeriesLocal(this.value)"/>
+    </div>
+    <div id="series-list-container"></div>
+    <div class="pagination" id="series-pagination" style="display:none">
+      <button class="btn" id="s-prev-btn" onclick="changeSeriesPage(-1)">← Anterior</button>
+      <span class="page-info" id="s-page-info"></span>
+      <button class="btn btn-primary" id="s-next-btn" onclick="changeSeriesPage(1)">Siguiente →</button>
+    </div>
+  </section>
+
+  <!-- ── READING ORDERS ── -->
+  <section class="section" id="section-orders">
+    <div id="orders-list-view">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+        <div class="section-title" style="margin-bottom:0">Órdenes de Lectura</div>
+        <button class="btn btn-primary" onclick="toggleCreatePanel()">+ Nueva orden</button>
+      </div>
+
+      <div class="create-order-panel" id="create-panel">
+        <div style="font-size:16px;font-weight:700;margin-bottom:16px;">Crear nueva orden de lectura</div>
+        <div class="form-group">
+          <label class="form-label">Nombre</label>
+          <input class="form-input" id="new-order-name" placeholder="Ej: Mi lectura de X-Men"/>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Descripción (opcional)</label>
+          <textarea class="form-input" id="new-order-desc" placeholder="Describe tu orden de lectura..."></textarea>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Añadir cómics</label>
+          <div class="search-wrapper">
+            <input class="form-input" id="issue-search-input" placeholder="Buscar cómic para añadir..." autocomplete="off" oninput="searchForAdd(this.value)"/>
+            <div class="search-results-dropdown" id="search-dropdown" style="display:none"></div>
+          </div>
+          <div class="added-issues" id="added-issues-list"></div>
+        </div>
+        <div style="display:flex;gap:10px;margin-top:8px">
+          <button class="btn btn-primary" onclick="createOrder()">Crear orden</button>
+          <button class="btn" onclick="toggleCreatePanel()">Cancelar</button>
+        </div>
+      </div>
+
+      <div id="orders-container"></div>
+    </div>
+
+    <div id="order-detail-view" style="display:none">
+      <div class="order-detail-header">
+        <button class="back-btn" onclick="showOrdersList()">← Volver</button>
+        <div style="flex:1">
+          <div class="section-title" style="margin-bottom:4px" id="order-detail-title"></div>
+          <div style="color:var(--text2);font-size:13px" id="order-detail-desc"></div>
+          <div class="progress-bar" style="margin-top:10px">
+            <div class="progress-fill" id="order-progress-fill"></div>
+          </div>
+          <div class="progress-label" id="order-progress-label"></div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:8px;align-items:flex-end;flex-shrink:0">
+          <button class="btn btn-success btn-sm" onclick="markAllRead()">✓ Marcar todo leído</button>
+          <button class="btn btn-sm" onclick="markAllUnread()">Desmarcar todo</button>
+          <button class="btn btn-danger btn-sm" id="delete-order-btn" onclick="deleteCurrentOrder()" style="display:none">Eliminar</button>
+        </div>
+      </div>
+      <div class="order-items-list" id="order-items-container"></div>
+    </div>
+  </section>
+
+  <!-- ── COLLECTION ── -->
+  <section class="section" id="section-collection">
+    <div class="section-title">Mi Colección</div>
+    <div class="collection-stats">
+      <div class="stat-card">
+        <div class="stat-number" id="col-read">0</div>
+        <div class="stat-label">Leídos</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-number" id="col-owned">0</div>
+        <div class="stat-label">En colección</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-number" id="col-total">0</div>
+        <div class="stat-label">Total marcados</div>
+      </div>
+    </div>
+    <div style="margin-bottom:16px">
+      <div class="filters">
+        <select id="col-filter" onchange="renderCollection()">
+          <option value="all">Todos</option>
+          <option value="read">Solo leídos</option>
+          <option value="owned">Solo colección</option>
+        </select>
+        <button class="btn btn-danger btn-sm" onclick="if(confirm('¿Borrar toda la colección?')) { localStorage.removeItem('mv_read'); localStorage.removeItem('mv_owned'); updateHeaderStats(); renderCollection(); }">Borrar todo</button>
+      </div>
+    </div>
+    <div class="comic-grid" id="collection-grid"></div>
+    <div class="empty" id="collection-empty" style="display:none">
+      <div class="empty-icon">📚</div>
+      <div class="empty-title">Tu colección está vacía</div>
+      <div>Explora cómics y márcalos como leídos o en colección</div>
+    </div>
+  </section>
+
+</main>
+
+<!-- ── ISSUE MODAL ── -->
+<div class="modal-overlay" id="issue-modal" onclick="closeModal(event)">
+  <div class="modal" style="position:relative">
+    <button class="modal-close" onclick="closeModal()">×</button>
+    <div class="modal-header">
+      <div class="modal-cover" id="modal-cover-wrap"></div>
+      <div style="flex:1;min-width:0">
+        <div class="modal-title" id="modal-title"></div>
+        <div class="modal-series" id="modal-series"></div>
+        <div class="modal-meta" id="modal-meta"></div>
+      </div>
+    </div>
+    <div class="modal-body">
+      <div class="modal-desc" id="modal-desc"></div>
+      <div class="modal-actions" id="modal-actions"></div>
+      <div class="creator-tags" id="modal-creators"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ── TOAST CONTAINER ── -->
+<div class="toast-container" id="toast-container"></div>
+
+<script>
+// ─────────────────────────────────────────────
+// CONFIG
+// ─────────────────────────────────────────────
+const API = '';  // same origin
+
+// ─────────────────────────────────────────────
+// STATE
+// ─────────────────────────────────────────────
+let browseOffset = 0;
+const BROWSE_LIMIT = 48;
+let browseTotalItems = 0;
+let currentSearchQuery = '';
+let currentSearchTimer = null;
+
+let seriesOffset = 0;
+const SERIES_LIMIT = 60;
+let seriesTotalItems = 0;
+let allSeriesData = [];
+
+let currentOrderSlug = null;
+let currentOrderData = null;
+let addedIssues = [];
+let addDropdownTimer = null;
+
+// Collection: sets of issue IDs stored as strings in localStorage
+function getRead() { return new Set(JSON.parse(localStorage.getItem('mv_read') || '[]')); }
+function getOwned() { return new Set(JSON.parse(localStorage.getItem('mv_owned') || '[]')); }
+function saveRead(set) { localStorage.setItem('mv_read', JSON.stringify([...set])); }
+function saveOwned(set) { localStorage.setItem('mv_owned', JSON.stringify([...set])); }
+
+// ─────────────────────────────────────────────
+// NAV
+// ─────────────────────────────────────────────
+function showSection(name) {
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
+  document.getElementById(`section-${name}`).classList.add('active');
+  event.currentTarget.classList.add('active');
+
+  if (name === 'browse' && !document.getElementById('browse-results').innerHTML) browseIssues();
+  if (name === 'series' && !document.getElementById('series-list-container').innerHTML) loadSeries();
+  if (name === 'orders') loadOrders();
+  if (name === 'collection') renderCollection();
+}
+
+// ─────────────────────────────────────────────
+// BROWSE
+// ─────────────────────────────────────────────
+async function browseIssues(resetPage = true) {
+  if (resetPage) browseOffset = 0;
+  const q = document.getElementById('search-input').value.trim();
+  const year = document.getElementById('filter-year').value;
+  const available = document.getElementById('filter-available').value;
+
+  const container = document.getElementById('browse-results');
+  container.innerHTML = '<div class="loading">Cargando cómics...</div>';
+
+  try {
+    let data;
+    if (q.length >= 2) {
+      const res = await fetch(`${API}/v1/search/issues?q=${encodeURIComponent(q)}&limit=${BROWSE_LIMIT}`);
+      const raw = await res.json();
+      data = { items: raw.items, total: raw.count, limit: BROWSE_LIMIT, offset: 0, has_next: false };
+    } else {
+      let url = `${API}/v1/issues?limit=${BROWSE_LIMIT}&offset=${browseOffset}`;
+      if (year) url += `&year=${year}`;
+      if (available) url += `&available=${available}`;
+      const res = await fetch(url);
+      data = await res.json();
+    }
+
+    browseTotalItems = data.total;
+    renderComicGrid(container, data.items);
+    renderPagination(data);
+
+  } catch (e) {
+    container.innerHTML = `<div class="empty"><div class="empty-icon">⚠️</div><div class="empty-title">Error al cargar</div><div>${e.message}</div></div>`;
+  }
+}
+
+// Initial load
+(async () => {
+  // Populate year filter
+  const yearSel = document.getElementById('filter-year');
+  for (let y = 2025; y >= 1939; y--) {
+    const opt = document.createElement('option');
+    opt.value = y; opt.textContent = y;
+    yearSel.appendChild(opt);
+  }
+  updateHeaderStats();
+  browseIssues();
+})();
+
+// Search debounce
+document.getElementById('search-input').addEventListener('input', function() {
+  clearTimeout(currentSearchTimer);
+  currentSearchTimer = setTimeout(() => browseIssues(), 350);
+});
+
+function renderComicGrid(container, items) {
+  if (!items || items.length === 0) {
+    container.innerHTML = '<div class="empty"><div class="empty-icon">🔍</div><div class="empty-title">Sin resultados</div><div>Intenta otra búsqueda</div></div>';
+    return;
+  }
+  const read = getRead();
+  const owned = getOwned();
+  container.innerHTML = '';
+  const grid = document.createElement('div');
+  grid.className = 'comic-grid';
+  items.forEach(issue => {
+    const isRead = read.has(String(issue.id));
+    const isOwned = owned.has(String(issue.id));
+    const card = document.createElement('div');
+    card.className = 'comic-card' + (isRead ? ' read' : isOwned ? ' owned' : '');
+    card.onclick = () => openIssueModal(issue.id);
+
+    const coverUrl = issue.cover_path
+      ? `${issue.cover_path}/portrait_uncanny.${issue.cover_extension || 'jpg'}`
+      : null;
+
+    card.innerHTML = `
+      ${isRead ? '<div class="badge badge-read">✓</div>' : isOwned ? '<div class="badge badge-owned">★</div>' : ''}
+      ${coverUrl
+        ? `<img class="comic-cover" src="${coverUrl}" alt="" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">`
+        : ''
+      }
+      <div class="cover-placeholder" style="display:${coverUrl ? 'none' : 'flex'}">📕</div>
+      <div class="comic-info">
+        <div class="comic-title">${escHtml(issue.title)}</div>
+        <div class="comic-meta">${issue.onSaleDate ? issue.onSaleDate.slice(0,4) : ''}</div>
+      </div>
+    `;
+    grid.appendChild(card);
+  });
+  container.appendChild(grid);
+}
+
+function renderPagination(data) {
+  const pag = document.getElementById('browse-pagination');
+  if (data.total <= BROWSE_LIMIT && !data.has_next) { pag.style.display = 'none'; return; }
+  pag.style.display = 'flex';
+  const currentPage = Math.floor(browseOffset / BROWSE_LIMIT) + 1;
+  const totalPages = Math.ceil(data.total / BROWSE_LIMIT);
+  document.getElementById('page-info').textContent = `Página ${currentPage} de ${totalPages} (${data.total} resultados)`;
+  document.getElementById('prev-btn').disabled = browseOffset === 0;
+  document.getElementById('next-btn').disabled = !data.has_next && browseOffset + BROWSE_LIMIT >= data.total;
+}
+
+function changePage(dir) {
+  browseOffset = Math.max(0, browseOffset + dir * BROWSE_LIMIT);
+  browseIssues(false);
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// ─────────────────────────────────────────────
+// ISSUE MODAL
+// ─────────────────────────────────────────────
+async function openIssueModal(issueId) {
+  document.getElementById('issue-modal').classList.add('open');
+  document.getElementById('modal-title').textContent = 'Cargando...';
+  document.getElementById('modal-series').textContent = '';
+  document.getElementById('modal-meta').textContent = '';
+  document.getElementById('modal-desc').textContent = '';
+  document.getElementById('modal-actions').innerHTML = '';
+  document.getElementById('modal-creators').innerHTML = '';
+  document.getElementById('modal-cover-wrap').innerHTML = '<div class="cover-placeholder">📕</div>';
+
+  try {
+    const res = await fetch(`${API}/v1/issues/${issueId}`);
+    const issue = await res.json();
+    renderModal(issue);
+  } catch(e) {
+    document.getElementById('modal-title').textContent = 'Error al cargar';
+  }
+}
+
+function renderModal(issue) {
+  const read = getRead();
+  const owned = getOwned();
+  const isRead = read.has(String(issue.id));
+  const isOwned = owned.has(String(issue.id));
+
+  document.getElementById('modal-title').textContent = issue.title;
+  document.getElementById('modal-series').textContent = issue.seriesName || '';
+  document.getElementById('modal-meta').innerHTML =
+    [issue.onSaleDate && `📅 ${issue.onSaleDate}`,
+     issue.pageCount && `📄 ${issue.pageCount} págs`,
+     issue.unlimitedDate ? '✅ En Marvel Unlimited' : '🔒 Sin Marvel Unlimited']
+    .filter(Boolean).join('&nbsp;&nbsp;');
+
+  document.getElementById('modal-desc').textContent = issue.description || '';
+
+  // Cover
+  const coverWrap = document.getElementById('modal-cover-wrap');
+  if (issue.cover?.path) {
+    const url = `${issue.cover.path}/portrait_uncanny.${issue.cover.extension || 'jpg'}`;
+    coverWrap.innerHTML = `<img src="${url}" alt="" style="width:100%;border-radius:4px" onerror="this.parentElement.innerHTML='<div class=cover-placeholder style=width:120px;height:180px>📕</div>'">`;
+  } else {
+    coverWrap.innerHTML = '<div class="cover-placeholder" style="width:120px;height:180px">📕</div>';
+  }
+
+  // Actions
+  const actions = document.getElementById('modal-actions');
+  actions.innerHTML = '';
+
+  // Read button
+  const readBtn = document.createElement('button');
+  readBtn.className = 'btn ' + (isRead ? 'btn-success' : '');
+  readBtn.textContent = isRead ? '✓ Leído' : 'Marcar como leído';
+  readBtn.onclick = () => {
+    const set = getRead();
+    isRead ? set.delete(String(issue.id)) : set.add(String(issue.id));
+    saveRead(set);
+    renderModal(issue);
+    updateHeaderStats();
+    browseIssues(false);
+  };
+  actions.appendChild(readBtn);
+
+  // Owned button
+  const ownedBtn = document.createElement('button');
+  ownedBtn.className = 'btn ' + (isOwned ? 'btn-gold' : '');
+  ownedBtn.textContent = isOwned ? '★ En colección' : 'Añadir a colección';
+  ownedBtn.onclick = () => {
+    const set = getOwned();
+    isOwned ? set.delete(String(issue.id)) : set.add(String(issue.id));
+    saveOwned(set);
+    renderModal(issue);
+    updateHeaderStats();
+  };
+  actions.appendChild(ownedBtn);
+
+  // Link to Marvel
+  if (issue.detailUrl) {
+    const link = document.createElement('a');
+    link.href = issue.detailUrl;
+    link.target = '_blank';
+    link.rel = 'noopener';
+    link.className = 'btn';
+    link.textContent = 'Leer en Marvel ↗';
+    actions.appendChild(link);
+  }
+
+  // Creators
+  const creatorsEl = document.getElementById('modal-creators');
+  creatorsEl.innerHTML = '';
+  (issue.creators || []).forEach(c => {
+    const tag = document.createElement('div');
+    tag.className = 'creator-tag';
+    tag.innerHTML = `${escHtml(c.name)} <span class="role">(${escHtml(c.role)})</span>`;
+    creatorsEl.appendChild(tag);
+  });
+}
+
+function closeModal(evt) {
+  if (!evt || evt.target.classList.contains('modal-overlay') || evt.type === 'click' && !evt.target.closest('.modal')) {
+    document.getElementById('issue-modal').classList.remove('open');
+  }
+}
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') document.getElementById('issue-modal').classList.remove('open');
+});
+
+// ─────────────────────────────────────────────
+// SERIES
+// ─────────────────────────────────────────────
+async function loadSeries(resetPage = true) {
+  if (resetPage) seriesOffset = 0;
+  const container = document.getElementById('series-list-container');
+  container.innerHTML = '<div class="loading">Cargando series...</div>';
+
+  try {
+    const res = await fetch(`${API}/v1/series?limit=${SERIES_LIMIT}&offset=${seriesOffset}`);
+    const data = await res.json();
+    allSeriesData = data.items;
+    seriesTotalItems = data.total;
+
+    document.getElementById('series-total').textContent = `(${data.total.toLocaleString()} series)`;
+    renderSeriesList(data.items);
+    renderSeriesPagination(data);
+  } catch(e) {
+    container.innerHTML = `<div class="empty"><div class="empty-icon">⚠️</div><div class="empty-title">Error al cargar series</div></div>`;
+  }
+}
+
+function renderSeriesList(items) {
+  const container = document.getElementById('series-list-container');
+  if (!items.length) {
+    container.innerHTML = '<div class="empty"><div class="empty-icon">📚</div><div class="empty-title">Sin resultados</div></div>';
+    return;
+  }
+  const list = document.createElement('div');
+  list.className = 'series-list';
+  items.forEach(s => {
+    const item = document.createElement('div');
+    item.className = 'series-item';
+    item.onclick = () => openSeriesDetail(s.id, s.name);
+    item.innerHTML = `
+      <div class="series-name">${escHtml(s.name)}</div>
+      <div class="series-count">${s.issueCount} números</div>
+    `;
+    list.appendChild(item);
+  });
+  container.innerHTML = '';
+  container.appendChild(list);
+}
+
+function filterSeriesLocal(q) {
+  const filtered = q
+    ? allSeriesData.filter(s => s.name.toLowerCase().includes(q.toLowerCase()))
+    : allSeriesData;
+  renderSeriesList(filtered);
+}
+
+function renderSeriesPagination(data) {
+  const pag = document.getElementById('series-pagination');
+  if (data.total <= SERIES_LIMIT) { pag.style.display = 'none'; return; }
+  pag.style.display = 'flex';
+  const p = Math.floor(seriesOffset / SERIES_LIMIT) + 1;
+  const t = Math.ceil(data.total / SERIES_LIMIT);
+  document.getElementById('s-page-info').textContent = `Página ${p} de ${t}`;
+  document.getElementById('s-prev-btn').disabled = seriesOffset === 0;
+  document.getElementById('s-next-btn').disabled = !data.has_next;
+}
+
+function changeSeriesPage(dir) {
+  seriesOffset = Math.max(0, seriesOffset + dir * SERIES_LIMIT);
+  loadSeries(false);
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+async function openSeriesDetail(seriesId, seriesName) {
+  // Navigate to browse filtered by this series
+  showSectionDirect('browse');
+  const container = document.getElementById('browse-results');
+  container.innerHTML = `<div class="loading">Cargando ${escHtml(seriesName)}...</div>`;
+  document.getElementById('browse-pagination').style.display = 'none';
+
+  try {
+    const res = await fetch(`${API}/v1/series/${seriesId}/issues?limit=200&offset=0`);
+    const data = await res.json();
+    const title = document.createElement('div');
+    title.className = 'section-title';
+    title.style.marginBottom = '16px';
+    title.innerHTML = `<button class="btn btn-sm" onclick="browseIssues()">← Explorar</button> ${escHtml(seriesName)}`;
+    container.innerHTML = '';
+    container.appendChild(title);
+    const grid = document.createElement('div');
+    renderComicGrid(grid, data.items);
+    container.appendChild(grid);
+  } catch(e) {
+    container.innerHTML = `<div class="empty"><div class="empty-icon">⚠️</div><div class="empty-title">Error al cargar</div></div>`;
+  }
+}
+
+function showSectionDirect(name) {
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('nav button').forEach((b, i) => {
+    b.classList.remove('active');
+    if (['browse','series','orders','collection'][i] === name) b.classList.add('active');
+  });
+  document.getElementById(`section-${name}`).classList.add('active');
+}
+
+// ─────────────────────────────────────────────
+// READING ORDERS
+// ─────────────────────────────────────────────
+async function loadOrders() {
+  showOrdersList();
+  const container = document.getElementById('orders-container');
+  container.innerHTML = '<div class="loading">Cargando órdenes...</div>';
+
+  try {
+    const res = await fetch(`${API}/v1/reading-orders`);
+    const orders = await res.json();
+    renderOrdersList(orders);
+  } catch(e) {
+    container.innerHTML = `<div class="empty"><div class="empty-icon">⚠️</div><div class="empty-title">Error al cargar</div></div>`;
+  }
+}
+
+function renderOrdersList(orders) {
+  const container = document.getElementById('orders-container');
+  if (!orders.length) {
+    container.innerHTML = '<div class="empty"><div class="empty-icon">📖</div><div class="empty-title">Sin órdenes de lectura</div><div>Crea tu primera orden de lectura</div></div>';
+    return;
+  }
+
+  const curated = orders.filter(o => o.is_curated);
+  const userOrders = orders.filter(o => !o.is_curated);
+
+  const read = getRead();
+  container.innerHTML = '';
+
+  if (curated.length) {
+    const h = document.createElement('div');
+    h.style.cssText = 'font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--text3);margin-bottom:12px;';
+    h.textContent = '⭐ Órdenes curadas';
+    container.appendChild(h);
+    const grid = document.createElement('div');
+    grid.className = 'orders-grid';
+    curated.forEach(o => grid.appendChild(buildOrderCard(o, read)));
+    container.appendChild(grid);
+  }
+
+  if (userOrders.length) {
+    const h = document.createElement('div');
+    h.style.cssText = 'font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--text3);margin-bottom:12px;margin-top:24px;';
+    h.textContent = '📝 Mis órdenes';
+    container.appendChild(h);
+    const grid = document.createElement('div');
+    grid.className = 'orders-grid';
+    userOrders.forEach(o => grid.appendChild(buildOrderCard(o, read)));
+    container.appendChild(grid);
+  }
+}
+
+function buildOrderCard(order, read) {
+  // We don't have item-level data here, but we can track via the order slug in localStorage
+  const progressKey = `mv_order_${order.slug}`;
+  const doneCount = (JSON.parse(localStorage.getItem(progressKey) || '[]')).length;
+  const total = order.item_count;
+  const pct = total > 0 ? Math.round(doneCount / total * 100) : 0;
+
+  const card = document.createElement('div');
+  card.className = 'order-card ' + (order.is_curated ? 'curated' : 'user-created');
+  card.onclick = () => openOrderDetail(order.slug);
+  card.innerHTML = `
+    <div class="order-name">${escHtml(order.name)}</div>
+    <div class="order-desc">${escHtml(order.description || '')}</div>
+    <div class="order-footer">
+      <span class="order-count">${total} cómics</span>
+      <span style="font-size:12px;color:var(--${order.is_curated ? 'red' : 'gold'})">${order.is_curated ? '⭐ Curada' : '✏️ Personal'}</span>
+    </div>
+    <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
+    <div class="progress-label">${doneCount} de ${total} leídos (${pct}%)</div>
+  `;
+  return card;
+}
+
+async function openOrderDetail(slug) {
+  currentOrderSlug = slug;
+  const listView = document.getElementById('orders-list-view');
+  const detailView = document.getElementById('order-detail-view');
+  listView.style.display = 'none';
+  detailView.style.display = 'block';
+  document.getElementById('order-detail-title').textContent = 'Cargando...';
+  document.getElementById('order-items-container').innerHTML = '<div class="loading">Cargando...</div>';
+
+  try {
+    const res = await fetch(`${API}/v1/reading-orders/${slug}`);
+    const order = await res.json();
+    currentOrderData = order;
+    renderOrderDetail(order);
+  } catch(e) {
+    document.getElementById('order-items-container').innerHTML = `<div class="empty"><div>Error al cargar</div></div>`;
+  }
+}
+
+function renderOrderDetail(order) {
+  document.getElementById('order-detail-title').textContent = order.name;
+  document.getElementById('order-detail-desc').textContent = order.description || '';
+
+  const deleteBtn = document.getElementById('delete-order-btn');
+  deleteBtn.style.display = order.is_curated ? 'none' : 'inline-flex';
+
+  const progressKey = `mv_order_${order.slug}`;
+  const doneSet = new Set(JSON.parse(localStorage.getItem(progressKey) || '[]'));
+  const total = order.items.length;
+  const done = doneSet.size;
+  const pct = total > 0 ? Math.round(done / total * 100) : 0;
+  document.getElementById('order-progress-fill').style.width = pct + '%';
+  document.getElementById('order-progress-label').textContent = `${done} de ${total} leídos (${pct}%)`;
+
+  const container = document.getElementById('order-items-container');
+  container.innerHTML = '';
+
+  order.items.forEach((item, idx) => {
+    const isRead = doneSet.has(String(item.id));
+    const el = document.createElement('div');
+    el.className = 'order-item' + (isRead ? ' item-read' : '');
+    el.id = `oi-${item.id}`;
+
+    const coverUrl = item.cover_path
+      ? `${item.cover_path}/portrait_small.${item.cover_extension || 'jpg'}`
+      : null;
+
+    el.innerHTML = `
+      <div class="item-num">${idx + 1}</div>
+      <div class="item-check ${isRead ? 'checked' : ''}" onclick="toggleOrderItem('${order.slug}', ${item.id}, this)" title="Marcar como leído">
+        ${isRead ? '✓' : ''}
+      </div>
+      ${coverUrl
+        ? `<img class="item-cover-thumb" src="${coverUrl}" alt="" loading="lazy" onerror="this.style.display='none'">`
+        : '<div class="item-cover-placeholder">📕</div>'
+      }
+      <div class="item-info">
+        <div class="item-title">${escHtml(item.issue_title)}</div>
+        ${item.series_name ? `<div class="item-series">${escHtml(item.series_name)}</div>` : ''}
+        ${item.note ? `<div class="item-note">${escHtml(item.note)}</div>` : ''}
+      </div>
+      <div class="item-actions">
+        ${item.issue_id ? `<span style="cursor:pointer;color:var(--text3);font-size:13px" onclick="openIssueModal(${item.issue_id})" title="Ver detalles">ℹ️</span>` : ''}
+        ${item.detail_url ? `<a class="item-link" href="${escHtml(item.detail_url)}" target="_blank" rel="noopener" title="Leer en Marvel">↗</a>` : ''}
+      </div>
+    `;
+    container.appendChild(el);
+  });
+}
+
+function toggleOrderItem(slug, itemId, checkEl) {
+  const progressKey = `mv_order_${slug}`;
+  const doneSet = new Set(JSON.parse(localStorage.getItem(progressKey) || '[]'));
+  const isNowRead = !doneSet.has(String(itemId));
+  if (isNowRead) {
+    doneSet.add(String(itemId));
+    checkEl.classList.add('checked');
+    checkEl.textContent = '✓';
+    checkEl.closest('.order-item').classList.add('item-read');
+  } else {
+    doneSet.delete(String(itemId));
+    checkEl.classList.remove('checked');
+    checkEl.textContent = '';
+    checkEl.closest('.order-item').classList.remove('item-read');
+  }
+  localStorage.setItem(progressKey, JSON.stringify([...doneSet]));
+
+  // Update progress
+  const order = currentOrderData;
+  const total = order.items.length;
+  const done = doneSet.size;
+  const pct = total > 0 ? Math.round(done / total * 100) : 0;
+  document.getElementById('order-progress-fill').style.width = pct + '%';
+  document.getElementById('order-progress-label').textContent = `${done} de ${total} leídos (${pct}%)`;
+}
+
+function markAllRead() {
+  if (!currentOrderData) return;
+  const slug = currentOrderData.slug;
+  const progressKey = `mv_order_${slug}`;
+  const allIds = currentOrderData.items.map(i => String(i.id));
+  localStorage.setItem(progressKey, JSON.stringify(allIds));
+  renderOrderDetail(currentOrderData);
+  toast('Todos los cómics marcados como leídos', 'success');
+}
+
+function markAllUnread() {
+  if (!currentOrderData) return;
+  const progressKey = `mv_order_${currentOrderData.slug}`;
+  localStorage.removeItem(progressKey);
+  renderOrderDetail(currentOrderData);
+}
+
+function showOrdersList() {
+  document.getElementById('orders-list-view').style.display = 'block';
+  document.getElementById('order-detail-view').style.display = 'none';
+  currentOrderSlug = null;
+  currentOrderData = null;
+}
+
+async function deleteCurrentOrder() {
+  if (!currentOrderSlug) return;
+  if (!confirm('¿Eliminar esta orden de lectura?')) return;
+  try {
+    const res = await fetch(`${API}/v1/reading-orders/${currentOrderSlug}`, { method: 'DELETE' });
+    if (res.ok) {
+      toast('Orden eliminada', 'success');
+      showOrdersList();
+      loadOrders();
+    } else {
+      const err = await res.json();
+      toast(err.detail || 'Error al eliminar', 'error');
+    }
+  } catch(e) {
+    toast('Error de conexión', 'error');
+  }
+}
+
+// ─────────────────────────────────────────────
+// CREATE ORDER
+// ─────────────────────────────────────────────
+function toggleCreatePanel() {
+  const panel = document.getElementById('create-panel');
+  panel.classList.toggle('open');
+  if (panel.classList.contains('open')) {
+    addedIssues = [];
+    document.getElementById('new-order-name').value = '';
+    document.getElementById('new-order-desc').value = '';
+    document.getElementById('added-issues-list').innerHTML = '';
+    document.getElementById('issue-search-input').value = '';
+  }
+}
+
+async function searchForAdd(q) {
+  clearTimeout(addDropdownTimer);
+  const dropdown = document.getElementById('search-dropdown');
+  if (q.length < 2) { dropdown.style.display = 'none'; return; }
+
+  addDropdownTimer = setTimeout(async () => {
+    try {
+      const res = await fetch(`${API}/v1/search/issues?q=${encodeURIComponent(q)}&limit=10`);
+      const data = await res.json();
+      dropdown.innerHTML = '';
+      if (!data.items.length) {
+        dropdown.innerHTML = '<div class="dropdown-item" style="color:var(--text3)">Sin resultados</div>';
+      } else {
+        data.items.forEach(issue => {
+          const item = document.createElement('div');
+          item.className = 'dropdown-item';
+          item.innerHTML = `<div class="dropdown-item-title">${escHtml(issue.title)}</div><div class="dropdown-item-meta">${issue.onSaleDate || ''}</div>`;
+          item.onclick = () => addIssueToOrder(issue);
+          dropdown.appendChild(item);
+        });
+      }
+      dropdown.style.display = 'block';
+    } catch(e) {}
+  }, 300);
+}
+
+function addIssueToOrder(issue) {
+  if (addedIssues.find(i => i.issue_id === issue.id)) {
+    toast('Este cómic ya está en la lista', 'error');
+    return;
+  }
+  addedIssues.push({ issue_id: issue.id, issue_title: issue.title, note: '' });
+  renderAddedIssues();
+  document.getElementById('search-dropdown').style.display = 'none';
+  document.getElementById('issue-search-input').value = '';
+}
+
+function removeAddedIssue(idx) {
+  addedIssues.splice(idx, 1);
+  renderAddedIssues();
+}
+
+function renderAddedIssues() {
+  const container = document.getElementById('added-issues-list');
+  container.innerHTML = '';
+  addedIssues.forEach((issue, idx) => {
+    const el = document.createElement('div');
+    el.className = 'added-issue';
+    el.innerHTML = `
+      <span class="added-issue-title">${idx + 1}. ${escHtml(issue.issue_title)}</span>
+      <button class="btn btn-danger btn-sm" onclick="removeAddedIssue(${idx})">✕</button>
+    `;
+    container.appendChild(el);
+  });
+}
+
+async function createOrder() {
+  const name = document.getElementById('new-order-name').value.trim();
+  const description = document.getElementById('new-order-desc').value.trim();
+  if (!name) { toast('El nombre es obligatorio', 'error'); return; }
+  if (!addedIssues.length) { toast('Añade al menos un cómic', 'error'); return; }
+
+  try {
+    const res = await fetch(`${API}/v1/reading-orders`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, description, items: addedIssues }),
+    });
+    if (res.ok) {
+      toast('Orden creada correctamente', 'success');
+      toggleCreatePanel();
+      loadOrders();
+    } else {
+      const err = await res.json();
+      toast(err.detail || 'Error al crear', 'error');
+    }
+  } catch(e) {
+    toast('Error de conexión', 'error');
+  }
+}
+
+// Close dropdown when clicking outside
+document.addEventListener('click', e => {
+  if (!e.target.closest('#issue-search-input') && !e.target.closest('#search-dropdown')) {
+    document.getElementById('search-dropdown').style.display = 'none';
+  }
+});
+
+// ─────────────────────────────────────────────
+// COLLECTION
+// ─────────────────────────────────────────────
+async function renderCollection() {
+  const filter = document.getElementById('col-filter').value;
+  const read = getRead();
+  const owned = getOwned();
+
+  const combined = new Set([...read, ...owned]);
+  const ids = filter === 'read' ? [...read] : filter === 'owned' ? [...owned] : [...combined];
+
+  document.getElementById('col-read').textContent = read.size;
+  document.getElementById('col-owned').textContent = owned.size;
+  document.getElementById('col-total').textContent = combined.size;
+  document.getElementById('hs-read').textContent = read.size;
+  document.getElementById('hs-owned').textContent = owned.size;
+
+  const grid = document.getElementById('collection-grid');
+  const empty = document.getElementById('collection-empty');
+
+  if (!ids.length) {
+    grid.innerHTML = '';
+    empty.style.display = 'block';
+    return;
+  }
+  empty.style.display = 'none';
+  grid.innerHTML = '<div class="loading" style="grid-column:1/-1">Cargando colección...</div>';
+
+  // Fetch in batches of 10 sequentially (no bulk endpoint, use search/individual)
+  // For simplicity, just show IDs and titles from localStorage
+  // We'll batch fetch what we can
+  const issues = [];
+  for (const id of ids.slice(0, 100)) {
+    try {
+      const res = await fetch(`${API}/v1/issues/${id}`);
+      if (res.ok) issues.push(await res.json());
+    } catch(e) {}
+  }
+
+  renderComicGrid(grid, issues.map(i => ({
+    ...i,
+    cover_path: i.cover?.path,
+    cover_extension: i.cover?.extension,
+  })));
+}
+
+function updateHeaderStats() {
+  const read = getRead();
+  const owned = getOwned();
+  document.getElementById('hs-read').textContent = read.size;
+  document.getElementById('hs-owned').textContent = owned.size;
+}
+
+// ─────────────────────────────────────────────
+// UTILITIES
+// ─────────────────────────────────────────────
+function escHtml(str) {
+  if (!str) return '';
+  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function toast(msg, type = 'success') {
+  const container = document.getElementById('toast-container');
+  const el = document.createElement('div');
+  el.className = `toast ${type}`;
+  el.innerHTML = `<span>${type === 'success' ? '✓' : '⚠'}</span><span>${escHtml(msg)}</span>`;
+  container.appendChild(el);
+  setTimeout(() => el.remove(), 3000);
+}
+</script>
+</body>
+</html>

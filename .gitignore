@@ -54,9 +54,9 @@ htmlcov/
 .ipynb_checkpoints/
 
 
-# Local database
-data/
-database/
+# Local database (root-level only, not src/marvel_metadata/data/)
+/data/
+/database/
 *.db
 *.sqlite
 

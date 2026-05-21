@@ -15,6 +15,9 @@ from marvel_metadata.api.v1.router import router as v1_router
 from marvel_metadata.api.deps import lifespan_db
 from marvel_metadata.api.middleware import RateLimitMiddleware
 from marvel_metadata.logging import setup_logging, get_logger
+from marvel_metadata.data.schema import SchemaManager
+from marvel_metadata.data.repository import ReadingOrderRepository
+from marvel_metadata.api.seeds import CURATED_READING_ORDERS
 
 logger = get_logger("api")
 
@@ -31,6 +34,14 @@ def get_docs_html() -> str | None:
     return None
 
 
+def get_app_html() -> str | None:
+    """Load the web app HTML."""
+    app_path = TEMPLATES_DIR / "app.html"
+    if app_path.exists():
+        return app_path.read_text()
+    return None
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """Application lifespan manager."""
@@ -39,6 +50,16 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     # Initialize database connection
     lifespan_db.init(settings.db_path)
+
+    # Ensure reading-orders schema exists (safe no-op if already migrated)
+    conn = lifespan_db.conn
+    SchemaManager(conn).migrate()
+
+    # Seed curated reading orders
+    repo = ReadingOrderRepository(conn)
+    for order in CURATED_READING_ORDERS:
+        repo.upsert_curated(**order)
+
     logger.info(f"API started, database: {settings.db_path}")
 
     yield
@@ -121,7 +142,7 @@ This is an **unofficial** project, not affiliated with Marvel Entertainment. Dat
         CORSMiddleware,
         allow_origins=["*"],
         allow_credentials=True,
-        allow_methods=["GET"],
+        allow_methods=["GET", "POST", "DELETE"],
         allow_headers=["*"],
     )
 
@@ -134,6 +155,15 @@ This is an **unofficial** project, not affiliated with Marvel Entertainment. Dat
 
     # Include v1 router
     app.include_router(v1_router, prefix="/v1")
+
+    # Serve the web app at /app
+    @app.get("/app", include_in_schema=False)
+    async def web_app():
+        html = get_app_html()
+        if html:
+            return HTMLResponse(content=html)
+        from fastapi.responses import RedirectResponse
+        return RedirectResponse(url="/swagger")
 
     # Serve docs directly at root
     @app.get("/", include_in_schema=False)
