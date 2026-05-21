@@ -1,0 +1,331 @@
+{% extends "base.html" %}
+{% block title %}Correos — WMS Almacén{% endblock %}
+{% block page_title %}Gestión de Correos{% endblock %}
+
+{% block content %}
+<div x-data="emailsData()" x-init="init()">
+
+  <!-- Top Actions Bar -->
+  <div class="flex flex-wrap items-center gap-3 mb-4">
+    <button @click="syncGmail()" :disabled="syncing"
+            class="flex items-center gap-2 px-4 py-2 bg-blue-700 hover:bg-blue-800 text-white text-sm font-semibold rounded-lg transition-colors disabled:opacity-60">
+      <svg class="w-4 h-4" :class="{'animate-spin': syncing}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+      </svg>
+      <span x-text="syncing ? 'Sincronizando…' : 'Sincronizar Gmail'"></span>
+    </button>
+
+    <!-- AI Status -->
+    <div class="flex items-center gap-2 px-3 py-2 bg-green-50 border border-green-200 rounded-lg">
+      <div class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+      <span class="text-xs font-semibold text-green-700">IA activa — Clasificación automática</span>
+    </div>
+
+    <!-- Config toggle -->
+    <button @click="showConfig=!showConfig" class="ml-auto flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 rounded-lg transition-colors">
+      <svg class="w-4 h-4 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+      Configurar clientes
+    </button>
+  </div>
+
+  <!-- Config Panel (collapsible) -->
+  <div x-show="showConfig" x-collapse class="card mb-4 border border-blue-200">
+    <div class="flex items-center justify-between mb-3">
+      <h3 class="font-semibold text-gray-900">Configuración de carpetas de clientes</h3>
+      <button @click="openClientModal()" class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg">
+        <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
+        Añadir cliente
+      </button>
+    </div>
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+      <template x-for="client in clientConfigs" :key="client.id">
+        <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200">
+          <div class="flex items-center gap-2">
+            <div class="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center text-blue-700 font-bold text-xs"
+                 x-text="(client.name?.[0]||'C').toUpperCase()"></div>
+            <div>
+              <p class="text-sm font-medium text-gray-800" x-text="client.name"></p>
+              <p class="text-xs text-gray-500 font-mono" x-text="client.email"></p>
+            </div>
+          </div>
+          <div class="flex gap-1">
+            <button @click="editClientConfig(client)" class="p-1 text-blue-600 hover:bg-blue-50 rounded">
+              <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+            </button>
+            <button @click="deleteClientConfig(client.id)" class="p-1 text-red-500 hover:bg-red-50 rounded">
+              <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+            </button>
+          </div>
+        </div>
+      </template>
+      <template x-if="!clientConfigs.length">
+        <p class="text-sm text-gray-400 col-span-full text-center py-4">No hay clientes configurados</p>
+      </template>
+    </div>
+  </div>
+
+  <!-- Main Email Layout -->
+  <div class="flex gap-4 min-h-[600px]">
+
+    <!-- Left Sidebar: Folders -->
+    <div class="w-48 flex-shrink-0">
+      <div class="card p-2 space-y-0.5">
+        <div class="px-3 py-1.5 text-xs font-bold text-gray-500 uppercase tracking-wide">Carpetas</div>
+        <button @click="selectFolder('inbox')" :class="selectedFolder==='inbox' ? 'bg-blue-700 text-white' : 'text-gray-700 hover:bg-gray-100'"
+                class="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors text-left">
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"/></svg>
+          Entrada
+          <span x-show="unreadCount > 0" class="ml-auto text-xs font-bold" :class="selectedFolder==='inbox' ? 'text-white/80' : 'text-blue-700'" x-text="unreadCount"></span>
+        </button>
+        <button @click="selectFolder('sent')" :class="selectedFolder==='sent' ? 'bg-blue-700 text-white' : 'text-gray-700 hover:bg-gray-100'"
+                class="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors text-left">
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg>
+          Enviados
+        </button>
+        <!-- Client folders -->
+        <div class="px-3 py-1.5 text-xs font-bold text-gray-500 uppercase tracking-wide mt-2">Clientes</div>
+        <template x-for="client in clientConfigs" :key="client.id">
+          <button @click="selectFolder('client_' + client.id)" :class="selectedFolder===('client_' + client.id) ? 'bg-blue-700 text-white' : 'text-gray-700 hover:bg-gray-100'"
+                  class="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors text-left">
+            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/></svg>
+            <span class="truncate" x-text="client.name"></span>
+          </button>
+        </template>
+      </div>
+    </div>
+
+    <!-- Email List -->
+    <div class="flex-1 card p-0 overflow-hidden flex flex-col">
+      <!-- Search -->
+      <div class="px-4 py-3 border-b border-gray-200">
+        <div class="relative">
+          <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+          <input type="search" class="form-input pl-9 text-sm" placeholder="Buscar correos…" x-model="emailSearch" @input.debounce.300ms="fetchEmails()">
+        </div>
+      </div>
+
+      <!-- Loading -->
+      <div x-show="loading" class="flex justify-center py-8"><div class="spinner"></div></div>
+
+      <!-- Email rows -->
+      <div x-show="!loading" class="flex-1 overflow-y-auto">
+        <template x-if="!emails.length">
+          <div class="text-center py-16 text-gray-400">
+            <svg class="w-12 h-12 mx-auto mb-3 text-gray-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+            Sin correos en esta carpeta
+          </div>
+        </template>
+        <template x-for="email in emails" :key="email.id">
+          <div class="email-row" :class="{'unread': !email.read}" @click="viewEmail(email)">
+            <!-- Avatar -->
+            <div class="w-9 h-9 rounded-full bg-gray-200 flex items-center justify-center text-sm font-bold text-gray-600 flex-shrink-0"
+                 :style="email.sender_color ? 'background:' + email.sender_color : ''"
+                 x-text="(email.from_name?.[0] || email.from_email?.[0] || '?').toUpperCase()"></div>
+
+            <!-- Content -->
+            <div class="min-w-0">
+              <div class="flex items-center gap-2 mb-0.5 flex-wrap">
+                <p class="text-sm font-semibold text-gray-900 truncate" x-text="email.from_name || email.from_email"></p>
+                <div class="flex gap-1.5 flex-wrap">
+                  <span x-show="email.ai_priority" class="email-priority-badge" :class="email.ai_priority" x-text="priorityLabel(email.ai_priority)"></span>
+                  <span x-show="email.ai_category" class="text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded font-medium" x-text="email.ai_category"></span>
+                  <span x-show="email.ai_classified" class="text-xs bg-purple-50 text-purple-600 px-1.5 py-0.5 rounded font-medium flex items-center gap-0.5">
+                    <svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
+                    IA
+                  </span>
+                </div>
+              </div>
+              <p class="email-subject text-sm text-gray-800 truncate" x-text="email.subject"></p>
+              <p x-show="email.ai_summary" class="text-xs text-gray-500 truncate mt-0.5" x-text="'IA: ' + email.ai_summary"></p>
+            </div>
+
+            <!-- Meta -->
+            <div class="text-right flex-shrink-0">
+              <p class="text-xs text-gray-400 mb-2" x-text="formatEmailDate(email.received_at)"></p>
+              <button @click.stop="notifyOffice(email)" x-show="!email.notified"
+                      class="text-xs px-2 py-1 bg-blue-50 text-blue-700 hover:bg-blue-100 rounded font-medium transition-colors whitespace-nowrap">
+                Notificar oficina
+              </button>
+              <span x-show="email.notified" class="text-xs text-green-600 font-medium whitespace-nowrap">✓ Notificado</span>
+            </div>
+          </div>
+        </template>
+      </div>
+    </div>
+
+    <!-- Email Detail Panel (if selected) -->
+    <div x-show="selectedEmail" class="w-80 xl:w-96 flex-shrink-0 card overflow-y-auto" x-transition style="display:none;">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="font-semibold text-gray-900 text-sm">Detalle del correo</h3>
+        <button @click="selectedEmail=null" class="text-gray-400 hover:text-gray-600">
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <template x-if="selectedEmail">
+        <div>
+          <h4 class="font-bold text-gray-900 mb-2" x-text="selectedEmail.subject"></h4>
+          <div class="space-y-1.5 text-sm text-gray-600 mb-4 pb-4 border-b border-gray-100">
+            <p><span class="font-medium text-gray-700">De:</span> <span x-text="selectedEmail.from_name || selectedEmail.from_email"></span></p>
+            <p><span class="font-medium text-gray-700">Para:</span> <span x-text="selectedEmail.to_email"></span></p>
+            <p><span class="font-medium text-gray-700">Fecha:</span> <span x-text="formatDateTime(selectedEmail.received_at)"></span></p>
+          </div>
+
+          <!-- AI metadata -->
+          <div x-show="selectedEmail.ai_summary || selectedEmail.ai_priority" class="bg-purple-50 rounded-lg p-3 mb-4">
+            <p class="text-xs font-bold text-purple-700 mb-2 flex items-center gap-1">
+              <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
+              Análisis IA
+            </p>
+            <p x-show="selectedEmail.ai_priority" class="text-xs text-gray-700 mb-1">
+              Prioridad: <span class="email-priority-badge" :class="selectedEmail.ai_priority" x-text="priorityLabel(selectedEmail.ai_priority)"></span>
+            </p>
+            <p x-show="selectedEmail.ai_category" class="text-xs text-gray-700 mb-1" x-text="'Categoría: ' + selectedEmail.ai_category"></p>
+            <p x-show="selectedEmail.ai_summary" class="text-xs text-gray-600 italic" x-text="selectedEmail.ai_summary"></p>
+          </div>
+
+          <!-- Body preview -->
+          <div class="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap max-h-48 overflow-y-auto bg-gray-50 rounded-lg p-3 mb-4"
+               x-text="selectedEmail.body_preview || selectedEmail.body || '(sin contenido)'"></div>
+
+          <!-- Actions -->
+          <div class="space-y-2">
+            <button x-show="!selectedEmail.notified" @click="notifyOffice(selectedEmail)"
+                    class="w-full flex items-center justify-center gap-2 py-2.5 text-sm font-semibold text-white bg-blue-700 hover:bg-blue-800 rounded-lg transition-colors">
+              <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>
+              Notificar oficina
+            </button>
+            <button x-show="selectedEmail.notified" class="w-full py-2.5 text-sm font-medium text-green-700 bg-green-50 rounded-lg cursor-default">
+              ✓ Oficina notificada
+            </button>
+          </div>
+        </div>
+      </template>
+    </div>
+  </div>
+
+  <!-- Client Config Modal -->
+  <div x-show="showClientModal" class="modal-backdrop" @click.self="showClientModal=false" style="display:none;">
+    <div class="modal-box max-w-md w-full p-6" x-transition>
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-lg font-semibold" x-text="editClientId ? 'Editar cliente' : 'Nuevo cliente'"></h2>
+        <button @click="showClientModal=false" class="text-gray-400 hover:text-gray-600"><svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg></button>
+      </div>
+      <form @submit.prevent="saveClientConfig()" class="space-y-4">
+        <div>
+          <label class="form-label">Nombre del cliente *</label>
+          <input type="text" class="form-input" x-model="clientForm.name" placeholder="Empresa / Cliente" required>
+        </div>
+        <div>
+          <label class="form-label">Email(s) del cliente *</label>
+          <input type="email" class="form-input" x-model="clientForm.email" placeholder="cliente@empresa.com" required>
+          <p class="text-xs text-gray-500 mt-1">Los correos de este email se clasificarán en su carpeta</p>
+        </div>
+        <div>
+          <label class="form-label">Nombre de la carpeta</label>
+          <input type="text" class="form-input" x-model="clientForm.folder_name" placeholder="Ej: Clientes / Empresa X">
+        </div>
+        <div class="flex gap-3">
+          <button type="button" @click="showClientModal=false" class="flex-1 px-4 py-2.5 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg">Cancelar</button>
+          <button type="submit" :disabled="submitting" class="flex-1 px-4 py-2.5 text-sm font-semibold text-white bg-blue-700 hover:bg-blue-800 rounded-lg disabled:opacity-60 flex items-center justify-center gap-2">
+            <div x-show="submitting" class="spinner spinner-sm border-white border-t-transparent"></div>
+            <span x-text="editClientId ? 'Guardar' : 'Crear'"></span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function emailsData() {
+  return {
+    loading: true, syncing: false, submitting: false,
+    emails: [], clientConfigs: [],
+    selectedFolder: 'inbox', selectedEmail: null,
+    emailSearch: '',
+    showConfig: false, showClientModal: false,
+    editClientId: null,
+    clientForm: { name: '', email: '', folder_name: '' },
+
+    get unreadCount() { return this.emails.filter(e => !e.read && this.selectedFolder === 'inbox').length; },
+
+    async init() {
+      await Promise.all([this.fetchEmails(), this.fetchClientConfigs()]);
+      this.loading = false;
+    },
+
+    async fetchEmails() {
+      this.loading = true;
+      try {
+        const params = new URLSearchParams({ folder: this.selectedFolder });
+        if (this.emailSearch) params.set('search', this.emailSearch);
+        const data = await api('GET', `/emails?${params}`);
+        this.emails = data.items || data || [];
+      } catch (_) {} finally { this.loading = false; }
+    },
+
+    async fetchClientConfigs() {
+      try { const data = await api('GET', '/email-clients'); this.clientConfigs = data.items || data || []; } catch (_) {}
+    },
+
+    selectFolder(folder) { this.selectedFolder = folder; this.selectedEmail = null; this.fetchEmails(); },
+
+    viewEmail(email) {
+      this.selectedEmail = email;
+      if (!email.read) {
+        email.read = true;
+        api('PATCH', `/emails/${email.id}`, { read: true }).catch(() => {});
+      }
+    },
+
+    async syncGmail() {
+      this.syncing = true;
+      try {
+        const result = await api('POST', '/emails/sync');
+        const count = result?.new_emails || 0;
+        toast(`Sincronización completada. ${count} correo(s) nuevos.`, 'success');
+        await this.fetchEmails();
+      } catch (_) {} finally { this.syncing = false; }
+    },
+
+    async notifyOffice(email) {
+      try {
+        await api('POST', `/emails/${email.id}/notify-office`);
+        email.notified = true;
+        toast('Oficina notificada correctamente', 'success');
+      } catch (_) {}
+    },
+
+    openClientModal() { this.editClientId=null; this.clientForm={name:'',email:'',folder_name:''}; this.showClientModal=true; },
+    editClientConfig(c) { this.editClientId=c.id; this.clientForm={name:c.name,email:c.email,folder_name:c.folder_name||''}; this.showClientModal=true; },
+    async saveClientConfig() {
+      if(this.submitting)return; this.submitting=true;
+      try {
+        if(this.editClientId){await api('PUT',`/email-clients/${this.editClientId}`,this.clientForm);toast('Cliente actualizado','success');}
+        else{await api('POST','/email-clients',this.clientForm);toast('Cliente añadido','success');}
+        this.showClientModal=false; await this.fetchClientConfigs();
+      }catch(_){}finally{this.submitting=false;}
+    },
+    async deleteClientConfig(id) {
+      if(!await confirmDialog('¿Eliminar esta configuración de cliente?'))return;
+      try{await api('DELETE',`/email-clients/${id}`);toast('Cliente eliminado','success');await this.fetchClientConfigs();}catch(_){}
+    },
+
+    priorityLabel(p) { return {high:'Alta',medium:'Media',low:'Baja'}[p] || p || ''; },
+
+    formatEmailDate(iso) {
+      if (!iso) return '';
+      const d = new Date(iso);
+      const now = new Date();
+      const diffH = (now - d) / 3600000;
+      if (diffH < 24) return d.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+      return d.toLocaleDateString('es-ES', { day: '2-digit', month: 'short' });
+    },
+    formatDateTime: (iso) => formatDateTime(iso),
+  };
+}
+</script>
+{% endblock %}

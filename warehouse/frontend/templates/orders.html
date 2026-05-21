@@ -1,0 +1,294 @@
+{% extends "base.html" %}
+{% block title %}Órdenes — WMS Almacén{% endblock %}
+{% block page_title %}Órdenes{% endblock %}
+
+{% block content %}
+<div x-data="ordersData()" x-init="init()">
+
+  <!-- Filters & Actions -->
+  <div class="flex flex-wrap gap-3 mb-6">
+    <div class="relative flex-1 min-w-[200px]">
+      <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+      <input type="search" class="form-input pl-10" placeholder="Buscar por cliente, nº orden…" x-model="search" @input.debounce.300ms="fetchOrders()">
+    </div>
+    <select class="form-input w-auto" x-model="filterStatus" @change="fetchOrders()">
+      <option value="">Todos los estados</option>
+      <option value="draft">Borrador</option>
+      <option value="pending">Pendiente</option>
+      <option value="picking">En Picking</option>
+      <option value="completed">Completado</option>
+      <option value="confirmed">Confirmado</option>
+      <option value="cancelled">Cancelado</option>
+      <option value="returned">Devuelto</option>
+    </select>
+    <input type="date" class="form-input w-auto" x-model="filterDate" @change="fetchOrders()" title="Filtrar por fecha">
+    <button @click="openModal()" class="flex items-center gap-2 px-4 py-2 bg-blue-700 hover:bg-blue-800 text-white text-sm font-semibold rounded-lg transition-colors">
+      <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
+      Nueva Orden
+    </button>
+  </div>
+
+  <!-- Table -->
+  <div class="card p-0 overflow-hidden">
+    <div x-show="loading" class="p-8 flex justify-center"><div class="spinner"></div></div>
+    <div x-show="!loading" class="overflow-x-auto">
+      <table class="responsive-table w-full text-sm">
+        <thead class="bg-gray-50 border-b border-gray-200">
+          <tr>
+            <th class="text-left px-4 py-3 font-semibold text-gray-500 text-xs uppercase tracking-wide">Nº Orden</th>
+            <th class="text-left px-4 py-3 font-semibold text-gray-500 text-xs uppercase tracking-wide">Cliente</th>
+            <th class="text-left px-4 py-3 font-semibold text-gray-500 text-xs uppercase tracking-wide hidden md:table-cell">Fecha</th>
+            <th class="text-center px-4 py-3 font-semibold text-gray-500 text-xs uppercase tracking-wide">Líneas</th>
+            <th class="text-center px-4 py-3 font-semibold text-gray-500 text-xs uppercase tracking-wide">Estado</th>
+            <th class="text-left px-4 py-3 font-semibold text-gray-500 text-xs uppercase tracking-wide hidden lg:table-cell">Asignado a</th>
+            <th class="text-center px-4 py-3 font-semibold text-gray-500 text-xs uppercase tracking-wide">Acciones</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-100">
+          <template x-if="!orders.length">
+            <tr><td colspan="7" class="py-12 text-center text-gray-400">No se encontraron órdenes</td></tr>
+          </template>
+          <template x-for="order in orders" :key="order.id">
+            <tr class="hover:bg-gray-50">
+              <td class="px-4 py-3 font-mono text-xs font-bold text-blue-700" data-label="Nº Orden" x-text="order.order_number || '#'+order.id"></td>
+              <td class="px-4 py-3" data-label="Cliente">
+                <p class="font-medium text-gray-800 truncate max-w-[140px]" x-text="order.customer_name || '—'"></p>
+                <p class="text-xs text-gray-400" x-text="order.customer_email || ''"></p>
+              </td>
+              <td class="px-4 py-3 text-xs text-gray-500 hidden md:table-cell" data-label="Fecha" x-text="formatDate(order.created_at)"></td>
+              <td class="px-4 py-3 text-center" data-label="Líneas">
+                <span class="text-sm font-semibold text-gray-700" x-text="(order.lines_count || order.lines?.length || 0)"></span>
+              </td>
+              <td class="px-4 py-3 text-center" data-label="Estado" x-html="statusBadge(order.status)"></td>
+              <td class="px-4 py-3 text-xs text-gray-600 hidden lg:table-cell" data-label="Asignado a" x-text="order.assigned_to || '—'"></td>
+              <td class="px-4 py-3" data-label="Acciones">
+                <div class="flex items-center justify-center gap-1 flex-wrap">
+                  <a :href="'/orders/' + order.id" class="px-2 py-1 text-xs font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded transition-colors">Ver</a>
+                  <template x-if="order.status === 'pending'">
+                    <button @click="startPicking(order.id)" class="px-2 py-1 text-xs font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 rounded transition-colors">Iniciar Picking</button>
+                  </template>
+                  <template x-if="order.status === 'picking'">
+                    <a :href="'/picking?order_id=' + order.id" class="px-2 py-1 text-xs font-medium text-indigo-700 bg-indigo-50 hover:bg-indigo-100 rounded transition-colors">Ver Picking</a>
+                  </template>
+                  <template x-if="order.status === 'completed'">
+                    <button @click="confirmOrder(order.id)" class="px-2 py-1 text-xs font-medium text-green-700 bg-green-50 hover:bg-green-100 rounded transition-colors">Confirmar</button>
+                  </template>
+                  <template x-if="['confirmed','completed'].includes(order.status)">
+                    <button @click="returnOrder(order.id)" class="px-2 py-1 text-xs font-medium text-orange-700 bg-orange-50 hover:bg-orange-100 rounded transition-colors">Devolver</button>
+                  </template>
+                  <template x-if="!['picking','completed','confirmed'].includes(order.status)">
+                    <button @click="cancelOrder(order.id)" class="px-2 py-1 text-xs font-medium text-red-700 bg-red-50 hover:bg-red-100 rounded transition-colors">Cancelar</button>
+                  </template>
+                </div>
+              </td>
+            </tr>
+          </template>
+        </tbody>
+      </table>
+    </div>
+    <!-- Pagination -->
+    <div x-show="!loading && totalPages > 1" class="flex items-center justify-between px-4 py-3 border-t border-gray-200 bg-gray-50">
+      <p class="text-xs text-gray-500" x-text="'Página ' + currentPage + ' de ' + totalPages"></p>
+      <div class="flex gap-2">
+        <button @click="changePage(currentPage-1)" :disabled="currentPage===1" class="px-3 py-1.5 text-xs font-medium bg-white border border-gray-300 rounded-lg disabled:opacity-40 hover:bg-gray-50">Anterior</button>
+        <button @click="changePage(currentPage+1)" :disabled="currentPage>=totalPages" class="px-3 py-1.5 text-xs font-medium bg-white border border-gray-300 rounded-lg disabled:opacity-40 hover:bg-gray-50">Siguiente</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: New Order -->
+  <div x-show="showModal" class="modal-backdrop" @click.self="closeModal()" style="display:none;">
+    <div class="modal-box max-w-2xl w-full" x-transition>
+      <div class="flex items-center justify-between px-6 py-4 border-b">
+        <h2 class="text-lg font-semibold">Nueva Orden</h2>
+        <button @click="closeModal()" class="text-gray-400 hover:text-gray-600"><svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg></button>
+      </div>
+      <form @submit.prevent="saveOrder()" class="px-6 py-4 space-y-4">
+        <!-- Customer Info -->
+        <div class="bg-gray-50 rounded-lg p-4 space-y-3">
+          <h3 class="text-sm font-semibold text-gray-700">Datos del cliente</h3>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="form-label">Nombre cliente *</label>
+              <input type="text" class="form-input" x-model="form.customer_name" placeholder="Empresa o persona" required>
+            </div>
+            <div>
+              <label class="form-label">Email</label>
+              <input type="email" class="form-input" x-model="form.customer_email" placeholder="cliente@email.com">
+            </div>
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="form-label">Teléfono</label>
+              <input type="text" class="form-input" x-model="form.customer_phone" placeholder="+34 600 000 000">
+            </div>
+            <div>
+              <label class="form-label">Asignar a empleado</label>
+              <select class="form-input" x-model="form.assigned_to_id">
+                <option value="">Sin asignar</option>
+                <template x-for="emp in employees" :key="emp.id">
+                  <option :value="emp.id" x-text="emp.full_name"></option>
+                </template>
+              </select>
+            </div>
+          </div>
+          <div>
+            <label class="form-label">Dirección de entrega</label>
+            <input type="text" class="form-input" x-model="form.delivery_address" placeholder="Calle, nº, ciudad…">
+          </div>
+          <div>
+            <label class="form-label">Notas</label>
+            <textarea class="form-input" x-model="form.notes" rows="2" placeholder="Instrucciones especiales…"></textarea>
+          </div>
+        </div>
+
+        <!-- Product lines -->
+        <div>
+          <div class="flex items-center justify-between mb-2">
+            <h3 class="text-sm font-semibold text-gray-700">Líneas de la orden</h3>
+            <button type="button" @click="addOrderLine()" class="text-xs text-blue-600 hover:text-blue-800 font-medium flex items-center gap-1">
+              <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
+              Añadir producto
+            </button>
+          </div>
+          <template x-if="!form.lines.length">
+            <p class="text-sm text-gray-400 text-center py-4 bg-gray-50 rounded-lg border border-dashed">Añade al menos un producto</p>
+          </template>
+          <div class="space-y-2">
+            <template x-for="(line, idx) in form.lines" :key="idx">
+              <div class="flex gap-2 items-end bg-gray-50 p-3 rounded-lg border border-gray-200">
+                <div class="flex-1">
+                  <label class="form-label text-xs">Producto (NIU o nombre)</label>
+                  <input type="text" class="form-input text-sm" x-model="line.product_niu" placeholder="NIU o nombre" @change="lookupProductLine(line)">
+                  <p class="text-xs text-blue-600 mt-0.5" x-text="line.product_name" x-show="line.product_name"></p>
+                </div>
+                <div class="w-24">
+                  <label class="form-label text-xs">Cantidad</label>
+                  <input type="number" class="form-input text-sm" x-model.number="line.quantity" min="1" step="1" placeholder="1">
+                </div>
+                <div class="w-28">
+                  <label class="form-label text-xs">Precio unit.</label>
+                  <input type="number" class="form-input text-sm" x-model.number="line.unit_price" min="0" step="0.01" placeholder="0.00">
+                </div>
+                <button type="button" @click="removeOrderLine(idx)" class="mb-0.5 p-2 text-red-500 hover:bg-red-50 rounded">
+                  <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+              </div>
+            </template>
+          </div>
+          <!-- Total -->
+          <div x-show="form.lines.length > 0" class="flex justify-end mt-3">
+            <div class="text-sm font-semibold text-gray-700">
+              Total estimado: <span class="text-blue-700" x-text="formatCurrency(orderTotal)"></span>
+            </div>
+          </div>
+        </div>
+
+        <div class="flex gap-3 pt-2">
+          <button type="button" @click="closeModal()" class="flex-1 px-4 py-2.5 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg">Cancelar</button>
+          <button type="submit" :disabled="submitting || !form.lines.length || !form.customer_name"
+                  class="flex-1 px-4 py-2.5 text-sm font-semibold text-white bg-blue-700 hover:bg-blue-800 rounded-lg disabled:opacity-60 flex items-center justify-center gap-2">
+            <div x-show="submitting" class="spinner spinner-sm border-white border-t-transparent"></div>
+            Crear Orden
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function ordersData() {
+  return {
+    loading: true, submitting: false, showModal: false,
+    orders: [], employees: [],
+    search: '', filterStatus: '', filterDate: '',
+    currentPage: 1, totalPages: 1,
+    form: { customer_name: '', customer_email: '', customer_phone: '', delivery_address: '', notes: '', assigned_to_id: '', lines: [] },
+
+    get orderTotal() {
+      return this.form.lines.reduce((sum, l) => sum + ((l.quantity || 0) * (l.unit_price || 0)), 0);
+    },
+
+    async init() {
+      await Promise.all([this.fetchOrders(), this.fetchEmployees()]);
+    },
+
+    async fetchOrders() {
+      this.loading = true;
+      try {
+        const params = new URLSearchParams({ page: this.currentPage, page_size: 20 });
+        if (this.search) params.set('search', this.search);
+        if (this.filterStatus) params.set('status', this.filterStatus);
+        if (this.filterDate) params.set('date', this.filterDate);
+        const data = await api('GET', `/orders?${params}`);
+        this.orders = data.items || data || [];
+        this.totalPages = data.total_pages || 1;
+      } catch (_) {} finally { this.loading = false; }
+    },
+
+    async fetchEmployees() {
+      try { const data = await api('GET', '/employees?page_size=100'); this.employees = data.items || data || []; } catch (_) {}
+    },
+
+    openModal() {
+      this.form = { customer_name: '', customer_email: '', customer_phone: '', delivery_address: '', notes: '', assigned_to_id: '', lines: [] };
+      this.showModal = true;
+    },
+    closeModal() { this.showModal = false; },
+
+    addOrderLine() { this.form.lines.push({ product_niu: '', product_name: '', quantity: 1, unit_price: 0 }); },
+    removeOrderLine(idx) { this.form.lines.splice(idx, 1); },
+
+    async lookupProductLine(line) {
+      if (!line.product_niu) return;
+      try {
+        const prod = await api('GET', `/products/lookup?q=${encodeURIComponent(line.product_niu)}`);
+        if (prod) { line.product_name = prod.name; if (!line.unit_price) line.unit_price = prod.price || 0; }
+      } catch (_) {}
+    },
+
+    async saveOrder() {
+      if (this.submitting) return;
+      this.submitting = true;
+      try {
+        await api('POST', '/orders', this.form);
+        toast('Orden creada correctamente', 'success');
+        this.closeModal(); await this.fetchOrders();
+      } catch (_) {} finally { this.submitting = false; }
+    },
+
+    async startPicking(id) {
+      try {
+        await api('POST', `/orders/${id}/start-picking`);
+        toast('Picking iniciado', 'success');
+        window.location.href = `/picking?order_id=${id}`;
+      } catch (_) {}
+    },
+
+    async confirmOrder(id) {
+      if (!await confirmDialog('¿Confirmar esta orden?')) return;
+      try { await api('POST', `/orders/${id}/confirm`); toast('Orden confirmada', 'success'); await this.fetchOrders(); } catch (_) {}
+    },
+
+    async returnOrder(id) {
+      if (!await confirmDialog('¿Registrar devolución para esta orden?', 'Devolución')) return;
+      try { await api('POST', `/orders/${id}/return`); toast('Devolución registrada', 'success'); await this.fetchOrders(); } catch (_) {}
+    },
+
+    async cancelOrder(id) {
+      if (!await confirmDialog('¿Cancelar esta orden? Esta acción no se puede deshacer.', 'Cancelar orden')) return;
+      try { await api('POST', `/orders/${id}/cancel`); toast('Orden cancelada', 'success'); await this.fetchOrders(); } catch (_) {}
+    },
+
+    changePage(p) { if (p<1||p>this.totalPages) return; this.currentPage=p; this.fetchOrders(); },
+    formatDate: (iso) => formatDate(iso),
+    formatCurrency: (n) => formatCurrency(n),
+    statusBadge: (s) => statusBadge(s),
+  };
+}
+</script>
+{% endblock %}

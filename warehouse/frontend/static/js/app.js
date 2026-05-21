@@ -1,0 +1,315 @@
+/* ============================================================
+   WMS Almacén - Shared App Utilities
+   ============================================================ */
+
+'use strict';
+
+/* ============================================================
+   API Helper
+   ============================================================ */
+async function api(method, path, body = null) {
+  const opts = {
+    method: method.toUpperCase(),
+    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+    credentials: 'same-origin',
+  };
+  if (body !== null) opts.body = JSON.stringify(body);
+
+  try {
+    const res = await fetch(`/api/v1${path}`, opts);
+    const contentType = res.headers.get('Content-Type') || '';
+    const isJson = contentType.includes('application/json');
+
+    if (!res.ok) {
+      let errMsg = `Error ${res.status}: ${res.statusText}`;
+      if (isJson) {
+        try {
+          const errData = await res.json();
+          errMsg = errData.detail || errData.message || errData.error || errMsg;
+          if (Array.isArray(errData.detail)) {
+            errMsg = errData.detail.map(e => e.msg || e.message || JSON.stringify(e)).join(', ');
+          }
+        } catch (_) {}
+      }
+      toast(errMsg, 'error');
+      throw new Error(errMsg);
+    }
+
+    if (res.status === 204 || !isJson) return null;
+    return await res.json();
+  } catch (err) {
+    if (err.name === 'TypeError' && err.message.includes('fetch')) {
+      toast('Sin conexión con el servidor', 'error');
+    }
+    throw err;
+  }
+}
+
+/* ============================================================
+   Toast Notifications
+   ============================================================ */
+(function initToastContainer() {
+  const init = () => {
+    if (!document.getElementById('toast-container')) {
+      const el = document.createElement('div');
+      el.id = 'toast-container';
+      document.body.appendChild(el);
+    }
+  };
+  if (document.body) init();
+  else document.addEventListener('DOMContentLoaded', init);
+})();
+
+function toast(message, type = 'info', duration = 4000) {
+  let container = document.getElementById('toast-container');
+  if (!container) {
+    container = document.createElement('div');
+    container.id = 'toast-container';
+    document.body.appendChild(container);
+  }
+
+  const icons = {
+    success: `<svg class="toast-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>`,
+    error:   `<svg class="toast-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>`,
+    warning: `<svg class="toast-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>`,
+    info:    `<svg class="toast-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>`,
+  };
+
+  const t = document.createElement('div');
+  t.className = `toast toast-${type}`;
+  t.innerHTML = `
+    ${icons[type] || icons.info}
+    <span class="toast-msg">${message}</span>
+    <button class="toast-close" aria-label="Cerrar">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+      </svg>
+    </button>
+  `;
+  container.appendChild(t);
+
+  const removeToast = () => {
+    t.classList.add('removing');
+    setTimeout(() => t.remove(), 260);
+  };
+
+  const timer = setTimeout(removeToast, duration);
+  t.querySelector('.toast-close').addEventListener('click', () => {
+    clearTimeout(timer);
+    removeToast();
+  });
+}
+
+/* ============================================================
+   Date / Currency Formatters
+   ============================================================ */
+function formatDate(iso) {
+  if (!iso) return '—';
+  try {
+    const d = new Date(iso);
+    return d.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  } catch (_) { return iso; }
+}
+
+function formatDateTime(iso) {
+  if (!iso) return '—';
+  try {
+    const d = new Date(iso);
+    return d.toLocaleString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  } catch (_) { return iso; }
+}
+
+function formatCurrency(amount) {
+  if (amount === null || amount === undefined) return '—';
+  return new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(amount);
+}
+
+function formatNumber(n, decimals = 0) {
+  if (n === null || n === undefined) return '—';
+  return new Intl.NumberFormat('es-ES', { minimumFractionDigits: decimals, maximumFractionDigits: decimals }).format(n);
+}
+
+/* ============================================================
+   Barcode Scanner (USB HID keyboard emulation)
+   ============================================================ */
+const barcodeScanner = {
+  _buffer: '',
+  _timer: null,
+  _callback: null,
+  _lastKeyTime: 0,
+  _minLength: 3,
+  _timeout: 120,
+
+  init(callback, minLength = 3) {
+    this._callback = callback;
+    this._minLength = minLength;
+    this._handler = this._onKey.bind(this);
+    document.addEventListener('keydown', this._handler);
+  },
+
+  destroy() {
+    if (this._handler) document.removeEventListener('keydown', this._handler);
+    this._buffer = '';
+    clearTimeout(this._timer);
+  },
+
+  _onKey(e) {
+    const tag = document.activeElement?.tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+
+    const now = Date.now();
+    if (now - this._lastKeyTime > this._timeout && this._buffer.length > 0) {
+      this._buffer = '';
+    }
+    this._lastKeyTime = now;
+
+    if (e.key === 'Enter') {
+      if (this._buffer.length >= this._minLength) {
+        const code = this._buffer;
+        this._buffer = '';
+        clearTimeout(this._timer);
+        if (this._callback) this._callback(code);
+      }
+      return;
+    }
+
+    if (e.key.length === 1) {
+      this._buffer += e.key;
+      clearTimeout(this._timer);
+      this._timer = setTimeout(() => { this._buffer = ''; }, this._timeout * 5);
+    }
+  },
+
+  fire(code) {
+    if (code && code.length >= this._minLength && this._callback) {
+      this._callback(code);
+    }
+  }
+};
+
+/* ============================================================
+   Register Service Worker
+   ============================================================ */
+function registerSW() {
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('/static/js/sw.js')
+        .then(reg => {
+          console.log('[SW] Registered:', reg.scope);
+          reg.addEventListener('updatefound', () => {
+            const newWorker = reg.installing;
+            newWorker.addEventListener('statechange', () => {
+              if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                toast('Nueva versión disponible. Recarga la página para actualizar.', 'info', 8000);
+              }
+            });
+          });
+        })
+        .catch(err => console.warn('[SW] Registration failed:', err));
+    });
+  }
+}
+
+/* ============================================================
+   Confirm Dialog (Promise-based)
+   ============================================================ */
+function confirmDialog(message, title = 'Confirmar acción') {
+  return new Promise((resolve) => {
+    const backdrop = document.createElement('div');
+    backdrop.className = 'confirm-dialog';
+    backdrop.innerHTML = `
+      <div class="confirm-box">
+        <div class="flex items-start gap-3 mb-4">
+          <div class="flex-shrink-0 w-10 h-10 bg-amber-100 rounded-full flex items-center justify-center">
+            <svg class="w-5 h-5 text-amber-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+            </svg>
+          </div>
+          <div>
+            <h3 class="font-semibold text-gray-900">${title}</h3>
+            <p class="text-sm text-gray-600 mt-1">${message}</p>
+          </div>
+        </div>
+        <div class="flex gap-3 justify-end">
+          <button id="confirm-cancel" class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors">Cancelar</button>
+          <button id="confirm-ok" class="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors">Confirmar</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(backdrop);
+
+    const cleanup = (result) => { backdrop.remove(); resolve(result); };
+    backdrop.querySelector('#confirm-ok').addEventListener('click', () => cleanup(true));
+    backdrop.querySelector('#confirm-cancel').addEventListener('click', () => cleanup(false));
+    backdrop.addEventListener('click', (e) => { if (e.target === backdrop) cleanup(false); });
+  });
+}
+
+/* ============================================================
+   Navigation Active Link Highlight
+   ============================================================ */
+function highlightActiveNav() {
+  const path = window.location.pathname;
+  document.querySelectorAll('.nav-link').forEach(link => {
+    const href = link.getAttribute('href') || '';
+    const isActive = href && (path === href || (href !== '/' && path.startsWith(href)));
+    link.classList.toggle('active', isActive);
+  });
+}
+
+/* ============================================================
+   Utility helpers
+   ============================================================ */
+function debounce(fn, ms = 300) {
+  let t;
+  return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); };
+}
+
+function escapeHtml(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+function statusBadge(status) {
+  const map = {
+    pending: ['badge-pending', 'Pendiente'],
+    picking: ['badge-picking', 'Picking'],
+    completed: ['badge-completed', 'Completado'],
+    cancelled: ['badge-cancelled', 'Cancelado'],
+    returned: ['badge-returned', 'Devuelto'],
+    confirmed: ['badge-confirmed', 'Confirmado'],
+    draft: ['badge-draft', 'Borrador'],
+    ok: ['badge-ok', 'OK'],
+    low: ['badge-low', 'Bajo'],
+    out: ['badge-out', 'Sin Stock'],
+    HIGH: ['badge-high', 'Alta'],
+    MEDIUM: ['badge-medium', 'Media'],
+    LOW: ['badge-low-p', 'Baja'],
+    active: ['badge-active', 'Activo'],
+    inactive: ['badge-inactive', 'Inactivo'],
+    maintenance: ['badge-maintenance', 'Mantenimiento'],
+    scheduled: ['badge-picking', 'Programado'],
+    in_transit: ['badge-returned', 'En Tránsito'],
+    delivered: ['badge-completed', 'Entregado'],
+    paid: ['badge-completed', 'Pagado'],
+    generated: ['badge-picking', 'Generado'],
+  };
+  const [cls, label] = map[status] || ['badge-draft', status || '?'];
+  return `<span class="badge ${cls}">${label}</span>`;
+}
+
+function stockStatusBadge(current, minimum) {
+  if (current <= 0) return statusBadge('out');
+  if (current <= minimum) return statusBadge('low');
+  return statusBadge('ok');
+}
+
+/* ============================================================
+   Init on DOM ready
+   ============================================================ */
+document.addEventListener('DOMContentLoaded', () => {
+  registerSW();
+  highlightActiveNav();
+});

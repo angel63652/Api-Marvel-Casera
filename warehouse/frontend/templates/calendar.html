@@ -1,0 +1,322 @@
+{% extends "base.html" %}
+{% block title %}Calendario — WMS Almacén{% endblock %}
+{% block page_title %}Calendario{% endblock %}
+
+{% block content %}
+<div x-data="calendarData()" x-init="init()">
+
+  <div class="flex flex-col lg:flex-row gap-6">
+
+    <!-- Main Calendar -->
+    <div class="flex-1">
+      <!-- Calendar Header -->
+      <div class="card mb-4">
+        <div class="flex items-center justify-between mb-4">
+          <div class="flex items-center gap-3">
+            <button @click="prevMonth()" class="p-2 hover:bg-gray-100 rounded-lg transition-colors text-gray-600">
+              <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg>
+            </button>
+            <h2 class="text-lg font-bold text-gray-900 min-w-[180px] text-center" x-text="monthLabel"></h2>
+            <button @click="nextMonth()" class="p-2 hover:bg-gray-100 rounded-lg transition-colors text-gray-600">
+              <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+            </button>
+          </div>
+          <div class="flex items-center gap-2">
+            <button @click="goToday()" class="px-3 py-1.5 text-xs font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg transition-colors">Hoy</button>
+            <!-- Filter checkboxes -->
+            <div class="flex gap-2 flex-wrap">
+              <label class="flex items-center gap-1 cursor-pointer">
+                <input type="checkbox" x-model="showTypes.truck" class="w-3 h-3 accent-blue-600">
+                <span class="w-2.5 h-2.5 rounded-full bg-blue-500"></span>
+                <span class="text-xs text-gray-600">Camiones</span>
+              </label>
+              <label class="flex items-center gap-1 cursor-pointer">
+                <input type="checkbox" x-model="showTypes.payroll" class="w-3 h-3 accent-green-600">
+                <span class="w-2.5 h-2.5 rounded-full bg-green-500"></span>
+                <span class="text-xs text-gray-600">Nóminas</span>
+              </label>
+              <label class="flex items-center gap-1 cursor-pointer">
+                <input type="checkbox" x-model="showTypes.meeting" class="w-3 h-3 accent-purple-600">
+                <span class="w-2.5 h-2.5 rounded-full bg-purple-500"></span>
+                <span class="text-xs text-gray-600">Reuniones</span>
+              </label>
+              <label class="flex items-center gap-1 cursor-pointer">
+                <input type="checkbox" x-model="showTypes.delivery" class="w-3 h-3 accent-orange-500">
+                <span class="w-2.5 h-2.5 rounded-full bg-orange-400"></span>
+                <span class="text-xs text-gray-600">Entregas</span>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <!-- Day headers -->
+        <div class="grid grid-cols-7 gap-0.5 mb-0.5">
+          <template x-for="day in ['Lun','Mar','Mié','Jue','Vie','Sáb','Dom']">
+            <div class="text-center text-xs font-semibold text-gray-500 py-2" x-text="day"></div>
+          </template>
+        </div>
+
+        <!-- Calendar grid -->
+        <div class="calendar-grid">
+          <template x-for="cell in calendarCells" :key="cell.key">
+            <div class="calendar-day" :class="{ 'today': cell.isToday, 'other-month': !cell.inMonth }"
+                 @click="selectDay(cell)">
+              <div class="day-num" x-text="cell.day"></div>
+              <template x-for="ev in filteredEventsForDay(cell.date)" :key="ev.id">
+                <div class="cal-event" :class="ev.type" x-text="ev.title"
+                     @click.stop="selectEvent(ev)" :title="ev.title"></div>
+              </template>
+              <span x-show="moreEventsCount(cell.date) > 0" class="text-xs text-gray-400"
+                    x-text="'+' + moreEventsCount(cell.date) + ' más'"></span>
+            </div>
+          </template>
+        </div>
+      </div>
+    </div>
+
+    <!-- Sidebar: Today's Events + Event detail -->
+    <div class="w-full lg:w-72 space-y-4">
+
+      <!-- Today's Events -->
+      <div class="card">
+        <h3 class="font-semibold text-gray-900 mb-3 flex items-center gap-2">
+          <svg class="w-4 h-4 text-blue-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+          Hoy, <span x-text="todayLabel"></span>
+        </h3>
+        <div class="space-y-2">
+          <template x-if="!todayEvents.length">
+            <p class="text-sm text-gray-400 text-center py-4">Sin eventos hoy</p>
+          </template>
+          <template x-for="ev in todayEvents" :key="ev.id">
+            <div class="flex items-start gap-2.5 p-2.5 rounded-lg hover:bg-gray-50 cursor-pointer" @click="selectEvent(ev)">
+              <div class="w-2 h-2 rounded-full mt-1.5 flex-shrink-0" :class="eventDot(ev.type)"></div>
+              <div class="flex-1 min-w-0">
+                <p class="text-sm font-medium text-gray-800 truncate" x-text="ev.title"></p>
+                <p class="text-xs text-gray-500" x-text="ev.time || ''"></p>
+              </div>
+            </div>
+          </template>
+        </div>
+        <button @click="openAddEventModal(selectedDate || todayIso)" class="mt-3 w-full py-2 text-sm font-medium text-blue-600 hover:bg-blue-50 border border-dashed border-blue-300 rounded-lg transition-colors flex items-center justify-center gap-1.5">
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
+          Añadir evento
+        </button>
+      </div>
+
+      <!-- Event Detail -->
+      <div x-show="selectedEvent" class="card border border-gray-200" x-transition>
+        <div class="flex items-start justify-between mb-3">
+          <h3 class="font-semibold text-gray-900" x-text="selectedEvent?.title"></h3>
+          <button @click="selectedEvent=null" class="text-gray-400 hover:text-gray-600">
+            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+          </button>
+        </div>
+        <div class="space-y-2 text-sm">
+          <div class="flex items-center gap-2 text-gray-600">
+            <svg class="w-4 h-4 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+            <span x-text="formatDate(selectedEvent?.date) + (selectedEvent?.time ? ' ' + selectedEvent.time : '')"></span>
+          </div>
+          <div x-show="selectedEvent?.description" class="text-gray-600" x-text="selectedEvent?.description"></div>
+          <div>
+            <span class="cal-event" :class="selectedEvent?.type" x-text="eventTypeLabel(selectedEvent?.type)"></span>
+          </div>
+        </div>
+        <div class="flex gap-2 mt-4">
+          <button @click="openEditEventModal(selectedEvent)" class="flex-1 py-1.5 text-xs font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 rounded">Editar</button>
+          <button @click="deleteEvent(selectedEvent?.id)" class="px-3 py-1.5 text-xs font-medium text-red-700 bg-red-50 hover:bg-red-100 rounded">Eliminar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add / Edit Event Modal -->
+  <div x-show="showEventModal" class="modal-backdrop" @click.self="showEventModal=false" style="display:none;">
+    <div class="modal-box max-w-md w-full p-6" x-transition>
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-lg font-semibold" x-text="editEventId ? 'Editar Evento' : 'Nuevo Evento'"></h2>
+        <button @click="showEventModal=false" class="text-gray-400 hover:text-gray-600"><svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg></button>
+      </div>
+      <form @submit.prevent="saveEvent()" class="space-y-4">
+        <div>
+          <label class="form-label">Título *</label>
+          <input type="text" class="form-input" x-model="eventForm.title" placeholder="Título del evento" required>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="form-label">Fecha *</label>
+            <input type="date" class="form-input" x-model="eventForm.date" required>
+          </div>
+          <div>
+            <label class="form-label">Hora</label>
+            <input type="time" class="form-input" x-model="eventForm.time">
+          </div>
+        </div>
+        <div>
+          <label class="form-label">Tipo *</label>
+          <select class="form-input" x-model="eventForm.type" required>
+            <option value="truck">Camión / Transporte</option>
+            <option value="payroll">Nómina / Pago</option>
+            <option value="meeting">Reunión</option>
+            <option value="delivery">Entrega</option>
+          </select>
+        </div>
+        <div>
+          <label class="form-label">Descripción</label>
+          <textarea class="form-input" x-model="eventForm.description" rows="3" placeholder="Descripción opcional…"></textarea>
+        </div>
+        <div class="flex gap-3">
+          <button type="button" @click="showEventModal=false" class="flex-1 px-4 py-2.5 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg">Cancelar</button>
+          <button type="submit" :disabled="submitting" class="flex-1 px-4 py-2.5 text-sm font-semibold text-white bg-blue-700 hover:bg-blue-800 rounded-lg disabled:opacity-60 flex items-center justify-center gap-2">
+            <div x-show="submitting" class="spinner spinner-sm border-white border-t-transparent"></div>
+            <span x-text="editEventId ? 'Guardar' : 'Crear'"></span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function calendarData() {
+  return {
+    loading: true, submitting: false,
+    year: new Date().getFullYear(),
+    month: new Date().getMonth(), // 0-indexed
+    events: [],
+    showEventModal: false, editEventId: null,
+    selectedDate: null, selectedEvent: null,
+    eventForm: { title: '', date: '', time: '', type: 'truck', description: '' },
+    showTypes: { truck: true, payroll: true, meeting: true, delivery: true },
+
+    get monthLabel() {
+      return new Date(this.year, this.month, 1).toLocaleDateString('es-ES', { month: 'long', year: 'numeric' }).replace(/^\w/, c => c.toUpperCase());
+    },
+    get todayIso() { return new Date().toISOString().slice(0,10); },
+    get todayLabel() {
+      return new Date().toLocaleDateString('es-ES', { day: 'numeric', month: 'long' });
+    },
+    get todayEvents() {
+      return this.filteredEventsForDay(this.todayIso);
+    },
+
+    get calendarCells() {
+      const cells = [];
+      const firstDay = new Date(this.year, this.month, 1);
+      // Monday=0 … Sunday=6
+      let startDow = (firstDay.getDay() + 6) % 7;
+      const daysInMonth = new Date(this.year, this.month + 1, 0).getDate();
+      const prevMonthDays = new Date(this.year, this.month, 0).getDate();
+      const today = this.todayIso;
+
+      for (let i = startDow - 1; i >= 0; i--) {
+        const d = new Date(this.year, this.month - 1, prevMonthDays - i);
+        cells.push({ day: d.getDate(), date: d.toISOString().slice(0,10), inMonth: false, isToday: false, key: 'prev-' + i });
+      }
+      for (let d = 1; d <= daysInMonth; d++) {
+        const date = `${this.year}-${String(this.month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+        cells.push({ day: d, date, inMonth: true, isToday: date === today, key: 'cur-' + d });
+      }
+      while (cells.length % 7 !== 0 || cells.length < 35) {
+        const idx = cells.length - startDow - daysInMonth + 1;
+        const d = new Date(this.year, this.month + 1, idx);
+        cells.push({ day: d.getDate(), date: d.toISOString().slice(0,10), inMonth: false, isToday: false, key: 'next-' + idx });
+      }
+      return cells;
+    },
+
+    filteredEventsForDay(dateStr) {
+      return this.events.filter(e => e.date === dateStr && this.showTypes[e.type]).slice(0, 3);
+    },
+    moreEventsCount(dateStr) {
+      const total = this.events.filter(e => e.date === dateStr && this.showTypes[e.type]).length;
+      return Math.max(0, total - 3);
+    },
+    eventDot(type) {
+      return { truck: 'bg-blue-500', payroll: 'bg-green-500', meeting: 'bg-purple-500', delivery: 'bg-orange-400' }[type] || 'bg-gray-400';
+    },
+    eventTypeLabel(type) {
+      return { truck: 'Camión', payroll: 'Nómina', meeting: 'Reunión', delivery: 'Entrega' }[type] || type || '';
+    },
+
+    async init() {
+      await this.fetchEvents();
+      this.loading = false;
+    },
+
+    async fetchEvents() {
+      try {
+        const params = new URLSearchParams({ year: this.year, month: this.month + 1 });
+        const data = await api('GET', `/calendar-events?${params}`);
+        this.events = data.items || data || [];
+      } catch (_) {}
+    },
+
+    prevMonth() {
+      if (this.month === 0) { this.month = 11; this.year--; }
+      else this.month--;
+      this.fetchEvents();
+    },
+    nextMonth() {
+      if (this.month === 11) { this.month = 0; this.year++; }
+      else this.month++;
+      this.fetchEvents();
+    },
+    goToday() {
+      const now = new Date();
+      this.year = now.getFullYear(); this.month = now.getMonth();
+      this.fetchEvents();
+    },
+
+    selectDay(cell) {
+      this.selectedDate = cell.date;
+      this.openAddEventModal(cell.date);
+    },
+    selectEvent(ev) {
+      this.selectedEvent = ev;
+    },
+
+    openAddEventModal(date) {
+      this.editEventId = null;
+      this.eventForm = { title: '', date: date || this.todayIso, time: '', type: 'truck', description: '' };
+      this.showEventModal = true;
+    },
+    openEditEventModal(ev) {
+      if (!ev) return;
+      this.editEventId = ev.id;
+      this.eventForm = { title: ev.title, date: ev.date, time: ev.time || '', type: ev.type, description: ev.description || '' };
+      this.showEventModal = true;
+    },
+
+    async saveEvent() {
+      if (this.submitting) return;
+      this.submitting = true;
+      try {
+        if (this.editEventId) {
+          await api('PUT', `/calendar-events/${this.editEventId}`, this.eventForm);
+          toast('Evento actualizado', 'success');
+        } else {
+          await api('POST', '/calendar-events', this.eventForm);
+          toast('Evento creado', 'success');
+        }
+        this.showEventModal = false; this.selectedEvent = null;
+        await this.fetchEvents();
+      } catch (_) {} finally { this.submitting = false; }
+    },
+
+    async deleteEvent(id) {
+      if (!id || !await confirmDialog('¿Eliminar este evento?')) return;
+      try {
+        await api('DELETE', `/calendar-events/${id}`);
+        toast('Evento eliminado', 'success');
+        this.selectedEvent = null; await this.fetchEvents();
+      } catch (_) {}
+    },
+
+    formatDate: (iso) => formatDate(iso),
+  };
+}
+</script>
+{% endblock %}

@@ -1,0 +1,270 @@
+{% extends "base.html" %}
+{% block title %}Productos — WMS Almacén{% endblock %}
+{% block page_title %}Productos{% endblock %}
+
+{% block content %}
+<div x-data="productsData()" x-init="init()">
+
+  <!-- Header Bar -->
+  <div class="flex flex-col sm:flex-row gap-3 mb-6">
+    <div class="flex-1 relative">
+      <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+      </svg>
+      <input type="search" placeholder="Buscar por nombre, NIU o código de barras…"
+             class="form-input pl-10" x-model="search" @input.debounce.300ms="fetchProducts()">
+    </div>
+    <select class="form-input w-auto min-w-[150px]" x-model="filterCategory" @change="fetchProducts()">
+      <option value="">Todas las categorías</option>
+      <template x-for="cat in categories" :key="cat">
+        <option :value="cat" x-text="cat"></option>
+      </template>
+    </select>
+    <button @click="openModal()" class="flex items-center gap-2 px-4 py-2 bg-blue-700 hover:bg-blue-800 text-white text-sm font-semibold rounded-lg transition-colors flex-shrink-0">
+      <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
+      </svg>
+      Nuevo Producto
+    </button>
+  </div>
+
+  <!-- Table -->
+  <div class="card p-0 overflow-hidden">
+    <div x-show="loading" class="p-8 flex justify-center">
+      <div class="spinner"></div>
+    </div>
+
+    <div x-show="!loading" class="overflow-x-auto">
+      <table class="responsive-table w-full text-sm">
+        <thead class="bg-gray-50 border-b border-gray-200">
+          <tr>
+            <th class="text-left px-4 py-3 font-semibold text-gray-500 text-xs uppercase tracking-wide">NIU</th>
+            <th class="text-left px-4 py-3 font-semibold text-gray-500 text-xs uppercase tracking-wide">Cód. Barras</th>
+            <th class="text-left px-4 py-3 font-semibold text-gray-500 text-xs uppercase tracking-wide">Nombre</th>
+            <th class="text-left px-4 py-3 font-semibold text-gray-500 text-xs uppercase tracking-wide hidden md:table-cell">Categoría</th>
+            <th class="text-left px-4 py-3 font-semibold text-gray-500 text-xs uppercase tracking-wide hidden lg:table-cell">Unidad</th>
+            <th class="text-right px-4 py-3 font-semibold text-gray-500 text-xs uppercase tracking-wide">Stock</th>
+            <th class="text-right px-4 py-3 font-semibold text-gray-500 text-xs uppercase tracking-wide hidden sm:table-cell">Mín</th>
+            <th class="text-center px-4 py-3 font-semibold text-gray-500 text-xs uppercase tracking-wide">Estado</th>
+            <th class="text-center px-4 py-3 font-semibold text-gray-500 text-xs uppercase tracking-wide">Acciones</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-100">
+          <template x-if="!products.length">
+            <tr><td colspan="9" class="py-12 text-center text-gray-400">
+              <svg class="w-12 h-12 mx-auto mb-3 text-gray-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 10V7"/>
+              </svg>
+              No se encontraron productos
+            </td></tr>
+          </template>
+          <template x-for="p in products" :key="p.id">
+            <tr class="hover:bg-gray-50 transition-colors">
+              <td class="px-4 py-3 font-mono text-xs font-semibold text-blue-700" data-label="NIU" x-text="p.niu"></td>
+              <td class="px-4 py-3 font-mono text-xs text-gray-600" data-label="Código" x-text="p.barcode || '—'"></td>
+              <td class="px-4 py-3 font-medium text-gray-800" data-label="Nombre" x-text="p.name"></td>
+              <td class="px-4 py-3 text-gray-600 hidden md:table-cell" data-label="Categoría" x-text="p.category || '—'"></td>
+              <td class="px-4 py-3 text-gray-600 hidden lg:table-cell" data-label="Unidad" x-text="p.unit || '—'"></td>
+              <td class="px-4 py-3 text-right font-semibold" data-label="Stock"
+                  :class="p.current_stock <= 0 ? 'text-red-600' : p.current_stock <= p.minimum_stock ? 'text-amber-600' : 'text-gray-800'"
+                  x-text="p.current_stock"></td>
+              <td class="px-4 py-3 text-right text-gray-500 hidden sm:table-cell" data-label="Mínimo" x-text="p.minimum_stock"></td>
+              <td class="px-4 py-3 text-center" data-label="Estado" x-html="stockStatusBadge(p.current_stock, p.minimum_stock)"></td>
+              <td class="px-4 py-3" data-label="Acciones">
+                <div class="flex items-center justify-center gap-2">
+                  <button @click="editProduct(p)" class="p-1.5 text-blue-600 hover:bg-blue-50 rounded transition-colors" title="Editar">
+                    <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                    </svg>
+                  </button>
+                  <button @click="deleteProduct(p.id)" class="p-1.5 text-red-600 hover:bg-red-50 rounded transition-colors" title="Eliminar">
+                    <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                    </svg>
+                  </button>
+                </div>
+              </td>
+            </tr>
+          </template>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Pagination -->
+    <div x-show="!loading && totalPages > 1" class="flex items-center justify-between px-4 py-3 border-t border-gray-200 bg-gray-50">
+      <p class="text-xs text-gray-500" x-text="'Página ' + currentPage + ' de ' + totalPages"></p>
+      <div class="flex gap-2">
+        <button @click="changePage(currentPage-1)" :disabled="currentPage === 1"
+                class="px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-lg disabled:opacity-40 hover:bg-gray-50 transition-colors">Anterior</button>
+        <button @click="changePage(currentPage+1)" :disabled="currentPage >= totalPages"
+                class="px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-lg disabled:opacity-40 hover:bg-gray-50 transition-colors">Siguiente</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Create / Edit Product -->
+  <div x-show="showModal" class="modal-backdrop" x-transition @click.self="closeModal()" style="display:none;">
+    <div class="modal-box max-w-lg w-full">
+      <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+        <h2 class="text-lg font-semibold text-gray-900" x-text="editId ? 'Editar Producto' : 'Nuevo Producto'"></h2>
+        <button @click="closeModal()" class="text-gray-400 hover:text-gray-600">
+          <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+          </svg>
+        </button>
+      </div>
+      <form @submit.prevent="saveProduct()" class="px-6 py-4 space-y-4">
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="form-label">NIU <span class="text-red-500">*</span></label>
+            <input type="text" class="form-input" :class="{'error': errors.niu}" x-model="form.niu" placeholder="P-001" required>
+            <p x-show="errors.niu" class="form-error" x-text="errors.niu"></p>
+          </div>
+          <div>
+            <label class="form-label">Código de Barras</label>
+            <input type="text" class="form-input" x-model="form.barcode" placeholder="1234567890123">
+          </div>
+        </div>
+        <div>
+          <label class="form-label">Nombre <span class="text-red-500">*</span></label>
+          <input type="text" class="form-input" :class="{'error': errors.name}" x-model="form.name" placeholder="Nombre del producto" required>
+          <p x-show="errors.name" class="form-error" x-text="errors.name"></p>
+        </div>
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="form-label">Categoría</label>
+            <input type="text" class="form-input" x-model="form.category" placeholder="Ej: Electrónica" list="categories-list">
+            <datalist id="categories-list">
+              <template x-for="cat in categories" :key="cat">
+                <option :value="cat"></option>
+              </template>
+            </datalist>
+          </div>
+          <div>
+            <label class="form-label">Unidad de Medida</label>
+            <input type="text" class="form-input" x-model="form.unit" placeholder="Ej: ud, kg, m">
+          </div>
+        </div>
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="form-label">Stock Actual</label>
+            <input type="number" class="form-input" x-model.number="form.current_stock" min="0" step="0.01" placeholder="0">
+          </div>
+          <div>
+            <label class="form-label">Stock Mínimo</label>
+            <input type="number" class="form-input" x-model.number="form.minimum_stock" min="0" step="0.01" placeholder="0">
+          </div>
+        </div>
+        <div>
+          <label class="form-label">Descripción</label>
+          <textarea class="form-input" x-model="form.description" rows="2" placeholder="Descripción opcional…"></textarea>
+        </div>
+        <div class="flex gap-3 pt-2">
+          <button type="button" @click="closeModal()" class="flex-1 px-4 py-2.5 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors">Cancelar</button>
+          <button type="submit" :disabled="submitting" class="flex-1 px-4 py-2.5 text-sm font-semibold text-white bg-blue-700 hover:bg-blue-800 rounded-lg transition-colors disabled:opacity-60 flex items-center justify-center gap-2">
+            <div x-show="submitting" class="spinner spinner-sm border-white border-t-transparent"></div>
+            <span x-text="editId ? 'Guardar cambios' : 'Crear producto'"></span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function productsData() {
+  return {
+    loading: true, submitting: false, showModal: false,
+    products: [], categories: [],
+    search: '', filterCategory: '',
+    currentPage: 1, totalPages: 1,
+    editId: null,
+    form: { niu: '', barcode: '', name: '', category: '', unit: '', current_stock: 0, minimum_stock: 0, description: '' },
+    errors: {},
+
+    async init() {
+      await Promise.all([this.fetchProducts(), this.fetchCategories()]);
+    },
+
+    async fetchProducts() {
+      this.loading = true;
+      try {
+        const params = new URLSearchParams({ page: this.currentPage, page_size: 20 });
+        if (this.search) params.set('search', this.search);
+        if (this.filterCategory) params.set('category', this.filterCategory);
+        const data = await api('GET', `/products?${params}`);
+        this.products = data.items || data || [];
+        this.totalPages = data.total_pages || 1;
+      } catch (_) {} finally { this.loading = false; }
+    },
+
+    async fetchCategories() {
+      try {
+        const data = await api('GET', '/products/categories');
+        this.categories = data || [];
+      } catch (_) {}
+    },
+
+    openModal() {
+      this.editId = null;
+      this.form = { niu: '', barcode: '', name: '', category: '', unit: '', current_stock: 0, minimum_stock: 0, description: '' };
+      this.errors = {};
+      this.showModal = true;
+    },
+
+    editProduct(p) {
+      this.editId = p.id;
+      this.form = { niu: p.niu, barcode: p.barcode || '', name: p.name, category: p.category || '', unit: p.unit || '', current_stock: p.current_stock, minimum_stock: p.minimum_stock, description: p.description || '' };
+      this.errors = {};
+      this.showModal = true;
+    },
+
+    closeModal() { this.showModal = false; },
+
+    validate() {
+      this.errors = {};
+      if (!this.form.niu.trim()) this.errors.niu = 'El NIU es obligatorio';
+      if (!this.form.name.trim()) this.errors.name = 'El nombre es obligatorio';
+      return Object.keys(this.errors).length === 0;
+    },
+
+    async saveProduct() {
+      if (!this.validate() || this.submitting) return;
+      this.submitting = true;
+      try {
+        if (this.editId) {
+          await api('PUT', `/products/${this.editId}`, this.form);
+          toast('Producto actualizado', 'success');
+        } else {
+          await api('POST', '/products', this.form);
+          toast('Producto creado', 'success');
+        }
+        this.closeModal();
+        await this.fetchProducts();
+        await this.fetchCategories();
+      } catch (_) {} finally { this.submitting = false; }
+    },
+
+    async deleteProduct(id) {
+      const ok = await confirmDialog('¿Eliminar este producto? Esta acción no se puede deshacer.');
+      if (!ok) return;
+      try {
+        await api('DELETE', `/products/${id}`);
+        toast('Producto eliminado', 'success');
+        await this.fetchProducts();
+      } catch (_) {}
+    },
+
+    changePage(p) {
+      if (p < 1 || p > this.totalPages) return;
+      this.currentPage = p;
+      this.fetchProducts();
+    },
+
+    stockStatusBadge: (cur, min) => stockStatusBadge(cur, min),
+  };
+}
+</script>
+{% endblock %}
