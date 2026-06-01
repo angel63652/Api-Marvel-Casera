@@ -1,0 +1,160 @@
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import select, or_
+from sqlalchemy.ext.asyncio import AsyncSession
+from typing import Optional
+
+from app.database import get_db
+from app.models.product import Product
+from app.models.employee import Employee
+from app.schemas.product import (
+    ProductCreate,
+    ProductUpdate,
+    ProductResponse,
+    ProductWithStock,
+)
+from app.auth import get_current_employee, require_role
+from app.services import stock_service
+
+router = APIRouter(prefix="/products", tags=["Productos"])
+
+
+def _serialize(product: Product) -> dict:
+    return {
+        "id": product.id,
+        "niu": product.niu,
+        "barcode": product.barcode,
+        "name": product.name,
+        "description": product.description,
+        "category": product.category,
+        "unit": product.unit,
+        "min_stock": product.min_stock,
+        "current_stock": product.current_stock,
+        "weight": product.weight,
+        "price_cost": product.price_cost,
+        "active": product.active,
+        "created_at": product.created_at,
+        "updated_at": product.updated_at,
+    }
+
+
+@router.get("", response_model=list[ProductResponse])
+async def list_products(
+    search: Optional[str] = None,
+    category: Optional[str] = None,
+    low_stock: bool = False,
+    active_only: bool = True,
+    db: AsyncSession = Depends(get_db),
+):
+    stmt = select(Product)
+    if active_only:
+        stmt = stmt.where(Product.active.is_(True))
+    if search:
+        like = f"%{search}%"
+        stmt = stmt.where(
+            or_(
+                Product.name.ilike(like),
+                Product.niu.ilike(like),
+                Product.barcode.ilike(like),
+            )
+        )
+    if category:
+        stmt = stmt.where(Product.category == category)
+    if low_stock:
+        stmt = stmt.where(Product.current_stock < Product.min_stock)
+    stmt = stmt.order_by(Product.name)
+    result = await db.execute(stmt)
+    return [ProductResponse.model_validate(_serialize(p)) for p in result.scalars().all()]
+
+
+@router.get("/low-stock")
+async def low_stock_products(db: AsyncSession = Depends(get_db)):
+    return await stock_service.check_low_stock(db)
+
+
+@router.get("/barcode/{barcode}", response_model=ProductResponse)
+async def get_by_barcode(barcode: str, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(Product).where(Product.barcode == barcode))
+    product = result.scalar_one_or_none()
+    if product is None:
+        raise HTTPException(status_code=404, detail="Producto no encontrado por código de barras")
+    return ProductResponse.model_validate(_serialize(product))
+
+
+@router.get("/niu/{niu}", response_model=ProductResponse)
+async def get_by_niu(niu: str, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(Product).where(Product.niu == niu))
+    product = result.scalar_one_or_none()
+    if product is None:
+        raise HTTPException(status_code=404, detail="Producto no encontrado por NIU")
+    return ProductResponse.model_validate(_serialize(product))
+
+
+@router.get("/{product_id}", response_model=ProductResponse)
+async def get_product(product_id: int, db: AsyncSession = Depends(get_db)):
+    product = await db.get(Product, product_id)
+    if product is None:
+        raise HTTPException(status_code=404, detail="Producto no encontrado")
+    return ProductResponse.model_validate(_serialize(product))
+
+
+@router.get("/{product_id}/stock", response_model=ProductWithStock)
+async def get_product_stock(product_id: int, db: AsyncSession = Depends(get_db)):
+    product = await db.get(Product, product_id)
+    if product is None:
+        raise HTTPException(status_code=404, detail="Producto no encontrado")
+    breakdown = await stock_service.get_stock_by_location(product_id, db)
+    data = _serialize(product)
+    data["stock_by_location"] = breakdown
+    data["is_low_stock"] = product.current_stock < product.min_stock
+    return ProductWithStock.model_validate(data)
+
+
+@router.post("", response_model=ProductResponse, status_code=201)
+async def create_product(
+    payload: ProductCreate,
+    db: AsyncSession = Depends(get_db),
+    _: Employee = Depends(require_role("MANAGER", "OFFICE")),
+):
+    existing = await db.execute(
+        select(Product).where(
+            or_(Product.niu == payload.niu, Product.barcode == payload.barcode)
+        )
+    )
+    if existing.scalar_one_or_none() is not None:
+        raise HTTPException(status_code=400, detail="Ya existe un producto con ese NIU o código de barras")
+    product = Product(**payload.model_dump())
+    db.add(product)
+    await db.flush()
+    await db.refresh(product)
+    return ProductResponse.model_validate(_serialize(product))
+
+
+@router.put("/{product_id}", response_model=ProductResponse)
+async def update_product(
+    product_id: int,
+    payload: ProductUpdate,
+    db: AsyncSession = Depends(get_db),
+    _: Employee = Depends(require_role("MANAGER", "OFFICE")),
+):
+    product = await db.get(Product, product_id)
+    if product is None:
+        raise HTTPException(status_code=404, detail="Producto no encontrado")
+    for field, value in payload.model_dump(exclude_unset=True).items():
+        setattr(product, field, value)
+    await db.flush()
+    await db.refresh(product)
+    return ProductResponse.model_validate(_serialize(product))
+
+
+@router.delete("/{product_id}", status_code=200)
+async def deactivate_product(
+    product_id: int,
+    db: AsyncSession = Depends(get_db),
+    _: Employee = Depends(require_role("ADMIN")),
+):
+    product = await db.get(Product, product_id)
+    if product is None:
+        raise HTTPException(status_code=404, detail="Producto no encontrado")
+    product.active = False
+    await db.flush()
+    return {"detail": "Producto desactivado", "id": product_id}

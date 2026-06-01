@@ -1,0 +1,120 @@
+"""Authentication and role-based access control.
+
+JWT (HS256) tokens, bcrypt password hashing, and FastAPI dependencies for
+extracting the current employee and enforcing role requirements.
+
+Role hierarchy used across the warehouse:
+- ADMIN    : full control (super user / system owner)
+- MANAGER  : warehouse / HR chief (stock changes, payroll, approvals)
+- OFFICE   : office staff (orders, clients, emails)
+- PICKER   : warehouse operator (picking)
+- DRIVER   : truck driver (routes, deliveries)
+"""
+from datetime import datetime, timedelta, timezone
+from typing import Optional
+
+import bcrypt
+from fastapi import Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordBearer
+from jose import JWTError, jwt
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.config import settings
+from app.database import get_db
+from app.models.employee import Employee
+
+# auto_error=False so public/page routes can probe for an optional token.
+oauth2_scheme = OAuth2PasswordBearer(
+    tokenUrl="/api/v1/employees/login", auto_error=False
+)
+
+
+def hash_password(password: str) -> str:
+    # bcrypt operates on at most 72 bytes; longer inputs are truncated.
+    pwd_bytes = password.encode("utf-8")[:72]
+    return bcrypt.hashpw(pwd_bytes, bcrypt.gensalt()).decode("utf-8")
+
+
+def verify_password(plain: str, hashed: str) -> bool:
+    try:
+        pwd_bytes = plain.encode("utf-8")[:72]
+        return bcrypt.checkpw(pwd_bytes, hashed.encode("utf-8"))
+    except Exception:
+        return False
+
+
+def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
+    to_encode = data.copy()
+    expire = datetime.now(timezone.utc) + (
+        expires_delta or timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+    )
+    to_encode.update({"exp": expire})
+    return jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
+
+
+def verify_token(token: str) -> dict:
+    try:
+        payload = jwt.decode(
+            token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM]
+        )
+        return payload
+    except JWTError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token inválido o expirado",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+
+async def get_current_employee(
+    token: Optional[str] = Depends(oauth2_scheme),
+    db: AsyncSession = Depends(get_db),
+) -> Employee:
+    if not token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="No autenticado",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    payload = verify_token(token)
+    employee_id = payload.get("sub")
+    if employee_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Token sin sujeto"
+        )
+    result = await db.execute(
+        select(Employee).where(Employee.id == int(employee_id))
+    )
+    employee = result.scalar_one_or_none()
+    if employee is None or not employee.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Empleado no encontrado o inactivo",
+        )
+    return employee
+
+
+def require_role(*roles: str):
+    """Dependency factory: ensures the current employee has one of `roles`.
+
+    ADMIN always passes. Usage:
+        Depends(require_role("ADMIN", "MANAGER"))
+    """
+
+    async def _checker(
+        current: Employee = Depends(get_current_employee),
+    ) -> Employee:
+        role_value = (
+            current.role.value if hasattr(current.role, "value") else current.role
+        )
+        if role_value == "ADMIN":
+            return current
+        if role_value not in roles:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Acceso denegado. Se requiere rol: {', '.join(roles)}",
+            )
+        return current
+
+    return _checker
