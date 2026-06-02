@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Optional
@@ -54,22 +54,34 @@ def _serialize(movement: Movement) -> MovementResponse:
 
 @router.get("", response_model=list[MovementResponse])
 async def list_movements(
+    response: Response,
     type: Optional[MovementType] = None,
     start_date: Optional[datetime] = None,
     end_date: Optional[datetime] = None,
     product_id: Optional[int] = None,
+    limit: int = Query(100, ge=1, le=500),
+    offset: int = Query(0, ge=0),
     db: AsyncSession = Depends(get_db),
 ):
     stmt = select(Movement)
+    count_stmt = select(func.count(func.distinct(Movement.id)))
     if type:
         stmt = stmt.where(Movement.type == type)
+        count_stmt = count_stmt.where(Movement.type == type)
     if start_date:
         stmt = stmt.where(Movement.date >= start_date)
+        count_stmt = count_stmt.where(Movement.date >= start_date)
     if end_date:
         stmt = stmt.where(Movement.date <= end_date)
+        count_stmt = count_stmt.where(Movement.date <= end_date)
     if product_id:
         stmt = stmt.join(MovementLine).where(MovementLine.product_id == product_id)
-    stmt = stmt.order_by(Movement.date.desc()).distinct()
+        count_stmt = count_stmt.join(MovementLine).where(
+            MovementLine.product_id == product_id
+        )
+    total = await db.scalar(count_stmt)
+    response.headers["X-Total-Count"] = str(total or 0)
+    stmt = stmt.order_by(Movement.date.desc()).distinct().limit(limit).offset(offset)
     result = await db.execute(stmt)
     return [_serialize(m) for m in result.scalars().unique().all()]
 

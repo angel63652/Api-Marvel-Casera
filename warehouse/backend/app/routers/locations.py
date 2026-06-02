@@ -1,5 +1,5 @@
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import select
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Optional
 
@@ -21,8 +21,11 @@ router = APIRouter(prefix="/locations", tags=["Ubicaciones"])
 
 @router.get("", response_model=list[LocationResponse])
 async def list_locations(
+    response: Response,
     aisle: Optional[str] = None,
     active_only: bool = True,
+    limit: int = Query(200, ge=1, le=1000),
+    offset: int = Query(0, ge=0),
     db: AsyncSession = Depends(get_db),
 ):
     stmt = select(Location)
@@ -30,7 +33,13 @@ async def list_locations(
         stmt = stmt.where(Location.is_active.is_(True))
     if aisle:
         stmt = stmt.where(Location.aisle == aisle)
-    stmt = stmt.order_by(Location.aisle, Location.rack, Location.position)
+    total = await db.scalar(select(func.count()).select_from(stmt.subquery()))
+    response.headers["X-Total-Count"] = str(total or 0)
+    stmt = (
+        stmt.order_by(Location.aisle, Location.rack, Location.position)
+        .limit(limit)
+        .offset(offset)
+    )
     result = await db.execute(stmt)
     return list(result.scalars().all())
 

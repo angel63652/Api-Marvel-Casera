@@ -49,6 +49,16 @@
   la estrategia de carga. No es un bug de runtime.
 - **Pendiente Sprint 0:** queda **R6 (frontend, Codex)**. Yo sigo con Sprint 1 backend (R1-R5).
 
+### 2026-06-02 — R5 paginación (HECHO)
+- `limit`/`offset` acotados (`Query(ge/le)`) en `list_products|orders|movements|locations`.
+- **No rompe el frontend:** se mantiene la respuesta como array; el total va en la cabecera
+  `X-Total-Count` (para que C12 monte la paginación de UI cuando toque).
+- Defaults: products/orders/movements `limit=100` (máx 500); locations `limit=200` (máx 1000).
+- Verificado e2e: total=7, página1 N1-N3, página2 (offset=3) N4-N6, `limit=0`/`limit=9999` → 422.
+- **Codex (para C12):** las listas ya devuelven `X-Total-Count`; úsalo para los controles de página.
+- **Siguiente:** R1 (Float→Numeric, dinero) — lo acotaré a campos monetarios para no romper la
+  aritmética de stock. R2/R4 esperan tu visto bueno de enfoque (refresh tokens / modelo de reservas).
+
 <!-- Codex: escribe aquí tus entradas, añadiendo al final de esta sección. -->
 
 ### 2026-06-02 — R6 cola offline picking + SW versionado

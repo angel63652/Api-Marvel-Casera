@@ -1,5 +1,5 @@
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import select, or_
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
+from sqlalchemy import select, or_, func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Optional
@@ -77,10 +77,13 @@ def _serialize(order: Order) -> OrderResponse:
 
 @router.get("", response_model=list[OrderResponse])
 async def list_orders(
+    response: Response,
     status: Optional[OrderStatus] = None,
     start_date: Optional[datetime] = None,
     end_date: Optional[datetime] = None,
     customer: Optional[str] = None,
+    limit: int = Query(100, ge=1, le=500),
+    offset: int = Query(0, ge=0),
     db: AsyncSession = Depends(get_db),
 ):
     stmt = select(Order)
@@ -95,7 +98,9 @@ async def list_orders(
         stmt = stmt.where(
             or_(Order.customer_name.ilike(like), Order.customer_id.ilike(like))
         )
-    stmt = stmt.order_by(Order.created_at.desc())
+    total = await db.scalar(select(func.count()).select_from(stmt.subquery()))
+    response.headers["X-Total-Count"] = str(total or 0)
+    stmt = stmt.order_by(Order.created_at.desc()).limit(limit).offset(offset)
     result = await db.execute(stmt)
     return [_serialize(o) for o in result.scalars().all()]
 

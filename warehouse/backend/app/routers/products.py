@@ -1,5 +1,5 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import select, or_
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
+from sqlalchemy import select, or_, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Optional
 
@@ -39,10 +39,13 @@ def _serialize(product: Product) -> dict:
 
 @router.get("", response_model=list[ProductResponse])
 async def list_products(
+    response: Response,
     search: Optional[str] = None,
     category: Optional[str] = None,
     low_stock: bool = False,
     active_only: bool = True,
+    limit: int = Query(100, ge=1, le=500),
+    offset: int = Query(0, ge=0),
     db: AsyncSession = Depends(get_db),
 ):
     stmt = select(Product)
@@ -61,7 +64,9 @@ async def list_products(
         stmt = stmt.where(Product.category == category)
     if low_stock:
         stmt = stmt.where(Product.current_stock < Product.min_stock)
-    stmt = stmt.order_by(Product.name)
+    total = await db.scalar(select(func.count()).select_from(stmt.subquery()))
+    response.headers["X-Total-Count"] = str(total or 0)
+    stmt = stmt.order_by(Product.name).limit(limit).offset(offset)
     result = await db.execute(stmt)
     return [ProductResponse.model_validate(_serialize(p)) for p in result.scalars().all()]
 
