@@ -43,7 +43,7 @@ Ver detalle en `AUDITORIA.md` §2-§3 y §8.
 | C6 | Export Excel (camiones, nóminas) | full | — | LIBRE | `openpyxl` ya está |
 | C7 | Aprobación con contraseña en ajustes de stock | backend | — | LIBRE | `verify_password` existe |
 | C10 | Etiquetas de barcode (Pillow) | backend | — | LIBRE | |
-| C12 | Paginación frontend (consume R5) | frontend | — | LIBRE | depende de R5 |
+| C12 | Paginación frontend (consume R5) | frontend | **Codex** | EN CURSO (2026-06-02) | consumir `limit`/`offset` + `X-Total-Count` en listados internos |
 
 ## 🔵 Portal Cliente (ver `PROPUESTA_PORTAL_CLIENTE.md`) — tras Sprint 0/1
 
