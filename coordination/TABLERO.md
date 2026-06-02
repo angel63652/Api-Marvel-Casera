@@ -59,7 +59,7 @@ Ver detalle en `AUDITORIA.md` Â§2-Â§3 y Â§8.
 | P5 | PWA portal cliente (separada de la interna) | frontend | **Codex** | ✅ HECHO (2026-06-02) | `/portal` con auth cliente, catalogo, carrito, pedidos, perfil/change-requests y stock SSE; PWA aislada (`portal_*`) |
 | P6 | Analítica con Polars (informes, ETL tarifas) | backend | **Claude** | ✅ HECHO (2026-06-02) | `GET /api/v1/analytics/sales-summary` + `POST /import-tier-prices` (CSV); Polars; 35 tests (3 nuevos) |
 | P7 | Refresh tokens del portal cliente | backend | **Claude** | ✅ HECHO (2026-06-02) | tabla `customer_refresh_tokens`; `/api/portal/auth/{refresh,logout}`; portal token a 30 min; migración `f6a7portalrt1`; 39 tests |
-| P8 | Auto-refresh del token en la PWA cliente (consume P7) | frontend | **Codex** | EN CURSO (2026-06-03) | contrato en BITACORA; `portal.js` (guardar refresh, refrescar en 401, logout server-side) |
+| P8 | Auto-refresh del token en la PWA cliente (consume P7) | frontend | **Codex** | HECHO (2026-06-03) | `portal.js` guarda `portal_refresh`, refresca/reintenta en 401 y revoca logout; SW versionado |
 
 ---
 

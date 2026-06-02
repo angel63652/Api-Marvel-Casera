@@ -2,9 +2,11 @@
 'use strict';
 
 const PORTAL_TOKEN_KEY = 'portal_token';
+const PORTAL_REFRESH_KEY = 'portal_refresh';
 const PORTAL_USER_KEY = 'portal_user';
 const PORTAL_CUSTOMER_KEY = 'portal_customer';
 const PORTAL_CART_KEY = 'portal_cart';
+let portalRefreshInFlight = null;
 
 function portalApp() {
   return {
@@ -12,6 +14,7 @@ function portalApp() {
     isAuthenticated: false,
     view: 'catalog',
     token: null,
+    refreshToken: null,
     user: null,
     customer: null,
     profile: null,
@@ -106,6 +109,7 @@ function portalApp() {
 
     loadSession() {
       this.token = localStorage.getItem(PORTAL_TOKEN_KEY);
+      this.refreshToken = localStorage.getItem(PORTAL_REFRESH_KEY);
       this.user = readJson(PORTAL_USER_KEY);
       this.customer = readJson(PORTAL_CUSTOMER_KEY);
       this.isAuthenticated = Boolean(this.token);
@@ -116,6 +120,10 @@ function portalApp() {
       this.user = data.user || null;
       this.customer = data.customer || null;
       localStorage.setItem(PORTAL_TOKEN_KEY, this.token);
+      if (data.refresh_token) {
+        this.refreshToken = data.refresh_token;
+        localStorage.setItem(PORTAL_REFRESH_KEY, this.refreshToken);
+      }
       localStorage.setItem(PORTAL_USER_KEY, JSON.stringify(this.user));
       localStorage.setItem(PORTAL_CUSTOMER_KEY, JSON.stringify(this.customer));
       this.isAuthenticated = true;
@@ -124,6 +132,7 @@ function portalApp() {
     clearSession() {
       this.stopStockStream();
       this.token = null;
+      this.refreshToken = null;
       this.user = null;
       this.customer = null;
       this.profile = null;
@@ -132,17 +141,32 @@ function portalApp() {
       this.changeRequests = [];
       this.isAuthenticated = false;
       localStorage.removeItem(PORTAL_TOKEN_KEY);
+      localStorage.removeItem(PORTAL_REFRESH_KEY);
       localStorage.removeItem(PORTAL_USER_KEY);
       localStorage.removeItem(PORTAL_CUSTOMER_KEY);
     },
 
-    logout() {
-      this.clearSession();
-      this.view = 'catalog';
-      this.authMode = 'login';
-      this.authError = '';
-      this.appError = '';
-      portalToast('Sesion cerrada', 'info');
+    async logout() {
+      const refreshToken = this.refreshToken;
+      try {
+        if (refreshToken) {
+          await fetch('/api/portal/auth/logout', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+            credentials: 'same-origin',
+            body: JSON.stringify({ refresh_token: refreshToken }),
+          });
+        }
+      } catch (err) {
+        console.warn('[Portal] Logout remoto no disponible:', err);
+      } finally {
+        this.clearSession();
+        this.view = 'catalog';
+        this.authMode = 'login';
+        this.authError = '';
+        this.appError = '';
+        portalToast('Sesion cerrada', 'info');
+      }
     },
 
     async login() {
@@ -185,7 +209,7 @@ function portalApp() {
       this.startStockStream();
     },
 
-    async portalApi(method, path, body = null, options = {}) {
+    async portalApi(method, path, body = null, options = {}, retryingAfterRefresh = false) {
       const needsAuth = options.auth !== false;
       const headers = { 'Content-Type': 'application/json', 'Accept': 'application/json' };
       if (needsAuth && this.token) headers.Authorization = `Bearer ${this.token}`;
@@ -200,6 +224,9 @@ function portalApp() {
       const res = await fetch(`/api/portal${path}`, request);
 
       if (res.status === 401 && needsAuth) {
+        if (!retryingAfterRefresh && shouldRefreshPortalPath(path) && await this.refreshAccessToken()) {
+          return this.portalApi(method, path, body, options, true);
+        }
         this.clearSession();
         this.authMode = 'login';
         throw new Error('Sesion caducada. Vuelve a iniciar sesion.');
@@ -219,6 +246,33 @@ function portalApp() {
         data,
         totalCount: Number.isFinite(parsedTotal) ? parsedTotal : null,
       };
+    },
+
+    async refreshAccessToken() {
+      const refreshToken = this.refreshToken || localStorage.getItem(PORTAL_REFRESH_KEY);
+      if (!refreshToken) return false;
+
+      if (!portalRefreshInFlight) {
+        portalRefreshInFlight = fetch('/api/portal/auth/refresh', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+          credentials: 'same-origin',
+          body: JSON.stringify({ refresh_token: refreshToken }),
+        })
+          .then(async (res) => {
+            if (!res.ok) return false;
+            const data = await res.json().catch(() => ({}));
+            if (!data.access_token) return false;
+            this.token = data.access_token;
+            localStorage.setItem(PORTAL_TOKEN_KEY, this.token);
+            this.isAuthenticated = true;
+            return true;
+          })
+          .catch(() => false)
+          .finally(() => { portalRefreshInFlight = null; });
+      }
+
+      return portalRefreshInFlight;
     },
 
     async fetchMe() {
@@ -293,6 +347,11 @@ function portalApp() {
       })
         .then(async (res) => {
           if (res.status === 401) {
+            if (await this.refreshAccessToken()) {
+              this.stockStreamAbort = null;
+              this.startStockStream();
+              return;
+            }
             this.clearSession();
             throw new Error('Sesion caducada. Vuelve a iniciar sesion.');
           }
@@ -621,6 +680,13 @@ function errorMessage(data, res) {
     return data.detail.map(item => item.msg || item.message || JSON.stringify(item)).join(', ');
   }
   return data?.detail || data?.message || data?.error || `Error ${res.status}: ${res.statusText}`;
+}
+
+function shouldRefreshPortalPath(path) {
+  return !path.startsWith('/auth/login') &&
+    !path.startsWith('/auth/register') &&
+    !path.startsWith('/auth/refresh') &&
+    !path.startsWith('/auth/logout');
 }
 
 function clampQuantity(value, available) {

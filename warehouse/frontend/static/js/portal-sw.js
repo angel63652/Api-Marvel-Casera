@@ -1,5 +1,5 @@
 // Service Worker for the customer portal PWA.
-const PORTAL_SW_VERSION = '2026-06-02-p5';
+const PORTAL_SW_VERSION = '2026-06-03-p8';
 const PORTAL_CACHE = `portal-static-${PORTAL_SW_VERSION}`;
 
 const PORTAL_ASSETS = [

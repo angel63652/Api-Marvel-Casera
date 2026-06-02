@@ -305,3 +305,12 @@ En `portal.js` (mismo patrón que R8 pero con keys del portal):
 - Verificacion: `git diff --check`, parseo del script inline con Node empaquetado, `pytest tests/test_analytics.py -q --tb=short` verde, smoke HTTP en SQLite limpia (`/`, `GET /analytics/sales-summary`, `POST /analytics/import-tier-prices`) verde.
 - Limitacion: el navegador embebido abrio `/login`, pero no completo login por fallo del runtime de interaccion (`fill`/click con clipboard/CDP). La comprobacion autenticada se cubrio con smoke HTTP.
 - [BACKEND] En la `wms.db` local existente, `GET /api/v1/analytics/sales-summary` devuelve 500: `sqlite3.OperationalError: no such column: products.price_base`; `POST /api/v1/analytics/import-tier-prices` devuelve 500 por `products.reserved_stock`. La BD local necesita migraciones/recreacion antes de smoke visual autenticado.
+
+### 2026-06-03 — P8 auto-refresh del portal cliente
+- Claim respetado: `portal.js`, `portal-sw.js` y cierre en tablero/bitacora.
+- Login/registro guardan `portal_refresh`; `/auth/me` conserva el refresh existente cuando no viene en la respuesta.
+- `portalApi()` reintenta una vez tras 401 usando `POST /api/portal/auth/refresh`, con una sola peticion de refresh compartida si hay varias llamadas simultaneas.
+- Logout llama `POST /api/portal/auth/logout` con el refresh y despues limpia `portal_token`, `portal_refresh`, usuario y cliente.
+- Stream SSE de stock intenta refrescar en 401 y reinicia la conexion si obtiene un access nuevo.
+- `portal-sw.js` sube a `2026-06-03-p8` para invalidar la cache de `portal.js`.
+- Verificacion: `node --check` en `portal.js` y `portal-sw.js`, mock Node de refresh+retry/preservar refresh/logout, `pytest tests/test_portal_refresh.py -q --tb=short` verde.
