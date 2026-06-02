@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select, or_
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Optional
 from datetime import datetime, timezone
@@ -122,15 +123,30 @@ async def create_order(
     db: AsyncSession = Depends(get_db),
     current: Employee = Depends(require_role("OFFICE", "MANAGER")),
 ):
-    order = Order(
-        order_number=picking_service.generate_order_number(),
-        customer_name=payload.customer_name,
-        customer_id=payload.customer_id,
-        notes=payload.notes,
-        status=OrderStatus.PENDING,
-    )
-    db.add(order)
-    await db.flush()
+    # Assign a sequential order number, retrying on the rare unique-collision
+    # race (two requests reading the same max at once). Savepoints keep the
+    # outer transaction intact between attempts.
+    order = None
+    for _ in range(5):
+        candidate = await picking_service.generate_order_number(db)
+        try:
+            async with db.begin_nested():
+                order = Order(
+                    order_number=candidate,
+                    customer_name=payload.customer_name,
+                    customer_id=payload.customer_id,
+                    notes=payload.notes,
+                    status=OrderStatus.PENDING,
+                )
+                db.add(order)
+                await db.flush()
+            break
+        except IntegrityError:
+            order = None
+    if order is None:
+        raise HTTPException(
+            status_code=500, detail="No se pudo asignar un número de orden único"
+        )
     for line_in in payload.lines:
         product = await db.get(Product, line_in.product_id)
         if product is None:

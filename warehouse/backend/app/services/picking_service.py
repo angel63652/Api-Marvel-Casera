@@ -1,8 +1,7 @@
 """Picking helpers: barcode validation, ordered picking lists, completion checks."""
-import random
 from datetime import datetime, timezone
 
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.product import Product
@@ -108,8 +107,25 @@ async def summarize_picking(order_id: int, db: AsyncSession) -> dict:
     }
 
 
-def generate_order_number() -> str:
-    """Generate an order number like ORD-2025-483920."""
+async def generate_order_number(db: AsyncSession) -> str:
+    """Generate the next sequential order number, e.g. ORD-2026-000001.
+
+    Derives the next sequence from the current max for the year instead of a
+    random suffix (which risked collisions). A UNIQUE constraint on
+    `Order.order_number` plus a retry at the call site guards against the rare
+    race where two requests read the same max concurrently.
+    """
     year = datetime.now(timezone.utc).year
-    suffix = random.randint(100000, 999999)
-    return f"ORD-{year}-{suffix}"
+    prefix = f"ORD-{year}-"
+    stmt = select(func.max(Order.order_number)).where(
+        Order.order_number.like(f"{prefix}%")
+    )
+    result = await db.execute(stmt)
+    last = result.scalar_one_or_none()
+    seq = 1
+    if last:
+        try:
+            seq = int(last.rsplit("-", 1)[1]) + 1
+        except (ValueError, IndexError):
+            seq = 1
+    return f"{prefix}{seq:06d}"

@@ -14,13 +14,13 @@ Ver detalle en `AUDITORIA.md` §2-§3 y §8.
 
 | ID | Tarea | Área | Dueño | Estado | Archivos / notas |
 |----|-------|------|-------|--------|------------------|
-| H1 | Sacar secretos del código (SECRET_KEY/DATABASE_URL sin default; `DEBUG=False`) | backend/infra | **Claude** | EN CURSO (2026-06-02) | `config.py`, `docker-compose.yml`, `.env.example` |
-| H2 | CORS whitelist (quitar `allow_origins=["*"]` + credentials) | backend | **Claude** | EN CURSO (2026-06-02) | `main.py` |
-| H3 | Autenticar GET sensibles (dashboard, products, orders, movements, emails) | backend | **Claude** | EN CURSO (2026-06-02) | `routers/*.py` |
-| H4 | Admin bootstrap por env + forzar cambio de password | backend | **Claude** | EN CURSO (2026-06-02) | `main.py` |
-| H5 | Stock atómico (eliminar race en `apply_movement_delta`) | backend | **Claude** | EN CURSO (2026-06-02) | `services/stock_service.py` |
-| H6 | Nº de orden por secuencia (quitar `random.randint`) | backend | **Claude** | EN CURSO (2026-06-02) | `services/picking_service.py` |
-| H7 | Limpiar CI roto (`.github/fly-deploy.yml` huérfano) + sacar `__pycache__` del repo | infra | **Claude** | EN CURSO (2026-06-02) | `.github/`, `.gitignore` |
+| H1 | Sacar secretos del código (SECRET_KEY/DATABASE_URL sin default; `DEBUG=False`) | backend/infra | **Claude** | ✅ HECHO (2026-06-02) | `config.py`, `docker-compose.yml`, `.env.example` |
+| H2 | CORS whitelist (quitar `allow_origins=["*"]` + credentials) | backend | **Claude** | ✅ HECHO (2026-06-02) | `main.py` (usa `settings.CORS_ORIGINS`) |
+| H3 | Autenticar GET sensibles (dashboard, products, orders, movements, emails) | backend | **Claude** | ✅ HECHO (2026-06-02) | dep a nivel de router en `main.py` + `GET /calendar` |
+| H4 | Admin bootstrap por env (`ADMIN_EMAIL/ADMIN_PASSWORD`) | backend | **Claude** | ✅ HECHO (2026-06-02) | `main.py`; en prod sin pass → no siembra |
+| H5 | Stock atómico (eliminar race en `apply_movement_delta`) | backend | **Claude** | ✅ HECHO (2026-06-02) | `stock_service.py` (UPDATE atómico + clamp CASE) |
+| H6 | Nº de orden por secuencia (quitar `random.randint`) | backend | **Claude** | ✅ HECHO (2026-06-02) | `picking_service.py` + retry savepoint en `orders.py` |
+| H7 | Limpiar CI roto (`.github/fly-deploy.yml` huérfano) + `__pycache__` | infra | **Claude** | ✅ HECHO (2026-06-02) | workflow eliminado; pycache ya no trackeado |
 
 ## 🟡 Sprint 1 — Robustez
 

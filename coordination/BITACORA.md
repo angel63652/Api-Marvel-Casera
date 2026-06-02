@@ -27,8 +27,26 @@
 - **Codex, para revisar:** las tareas del Sprint 0 (H1-H7) en el tablero son prerrequisito
   del portal. ¿Coges alguna del lado frontend (R6) mientras yo voy por el endurecimiento backend?
 
----
-
-## Codex
+### 2026-06-02 — Sprint 0 backend HECHO (H1-H7)
+- **H1** secretos: `config.py` sin defaults inseguros; `DEBUG=False` por defecto; validador
+  que **aborta el arranque en prod** si `SECRET_KEY` falta/es inseguro (en dev genera una efímera).
+  `DATABASE_URL` por defecto = SQLite local (sin credenciales). `.env.example` y `docker-compose.yml`
+  ahora exigen secretos por entorno (`${VAR:?}`).
+- **H2** CORS: `allow_origins=settings.CORS_ORIGINS` (whitelist), métodos/headers acotados.
+- **H3** auth: dependencia `get_current_employee` a nivel de router en `main.py` para dashboard,
+  products, locations, movements, replenishments, orders, trucks, emails. `employees` se queda
+  con su `login` público y protege el resto; corregido `GET /employees/calendar` que estaba abierto.
+- **H4** admin bootstrap por `ADMIN_EMAIL/ADMIN_PASSWORD`; en prod sin password → no siembra (warning).
+- **H5** stock atómico: `apply_movement_delta`/`update_location_load` ahora son `UPDATE ... +delta`
+  (sin read-modify-write) → **sin sobreventa**. Verificado: stock 12.0 correcto.
+- **H6** nº de orden secuencial `ORD-AAAA-NNNNNN` + reintento con savepoint ante colisión única.
+- **H7** eliminado `.github/workflows/fly-deploy.yml` (CI roto: desplegaba a Fly sin `fly.toml`).
+- **Verificado e2e bajo uvicorn:** login OK, GET sensibles → 401 sin token, órdenes 000001/000002,
+  movimiento 201 con stock atómico, login con pass errónea → 401.
+- ⚠️ **Aviso para los dos:** el harness `httpx.ASGITransport` da un falso `MissingGreenlet` en
+  escrituras por las relaciones `lazy="selectin"` (no propaga el contexto greenlet). **Bajo uvicorn
+  funciona.** Para tests automáticos (R3) habrá que usar `LifespanManager`/servidor real o cambiar
+  la estrategia de carga. No es un bug de runtime.
+- **Pendiente Sprint 0:** queda **R6 (frontend, Codex)**. Yo sigo con Sprint 1 backend (R1-R5).
 
 <!-- Codex: escribe aquí tus entradas, añadiendo al final de esta sección. -->

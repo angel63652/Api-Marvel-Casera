@@ -4,7 +4,7 @@ Stock is derived from the movement ledger so it can always be recomputed:
   ENTRY, REPLENISHMENT, RETURN  -> increase stock
   EXIT, ADJUSTMENT (negative)   -> decrease stock
 """
-from sqlalchemy import select, func
+from sqlalchemy import select, func, update, case
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.product import Product
@@ -50,13 +50,27 @@ async def recalculate_and_store(product_id: int, db: AsyncSession) -> float:
 async def apply_movement_delta(
     product_id: int, delta: float, db: AsyncSession
 ) -> float:
-    """Apply an incremental change to a product's cached stock (fast path)."""
-    product = await db.get(Product, product_id)
-    if product is None:
+    """Apply an incremental change to a product's cached stock atomically.
+
+    Uses a single `UPDATE ... SET current_stock = current_stock + :delta` so
+    concurrent movements/picks cannot lose updates (no read-modify-write race
+    → no overselling). Returns the new stock, or 0.0 if the product is gone.
+    """
+    result = await db.execute(
+        update(Product)
+        .where(Product.id == product_id)
+        .values(current_stock=func.coalesce(Product.current_stock, 0.0) + delta)
+        .returning(Product.current_stock)
+    )
+    row = result.first()
+    if row is None:
         return 0.0
-    product.current_stock = (product.current_stock or 0.0) + delta
+    # Keep the identity-mapped instance (if loaded) consistent with the DB.
+    product = await db.get(Product, product_id)
+    if product is not None:
+        await db.refresh(product, attribute_names=["current_stock"])
     await db.flush()
-    return product.current_stock
+    return float(row[0] or 0.0)
 
 
 async def check_low_stock(db: AsyncSession) -> list[dict]:
@@ -94,13 +108,22 @@ async def check_low_stock(db: AsyncSession) -> list[dict]:
 async def update_location_load(
     location_id: int, delta: float, db: AsyncSession
 ) -> float:
-    """Adjust a location's current_load by `delta` (clamped to >= 0)."""
-    location = await db.get(Location, location_id)
-    if location is None:
+    """Adjust a location's current_load by `delta` atomically (clamped to >= 0)."""
+    new_load = func.coalesce(Location.current_load, 0.0) + delta
+    result = await db.execute(
+        update(Location)
+        .where(Location.id == location_id)
+        .values(current_load=case((new_load < 0, 0.0), else_=new_load))
+        .returning(Location.current_load)
+    )
+    row = result.first()
+    if row is None:
         return 0.0
-    location.current_load = max(0.0, (location.current_load or 0.0) + delta)
+    location = await db.get(Location, location_id)
+    if location is not None:
+        await db.refresh(location, attribute_names=["current_load"])
     await db.flush()
-    return location.current_load
+    return float(row[0] or 0.0)
 
 
 async def update_product_location_qty(

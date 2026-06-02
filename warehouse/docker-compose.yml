@@ -4,9 +4,10 @@ services:
     container_name: wms_db
     restart: unless-stopped
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: password
-      POSTGRES_DB: warehouse_db
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      # Required: set POSTGRES_PASSWORD in your .env (compose fails if missing).
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD requerido}
+      POSTGRES_DB: ${POSTGRES_DB:-warehouse_db}
     ports:
       - "5432:5432"
     volumes:
@@ -26,8 +27,12 @@ services:
       db:
         condition: service_healthy
     environment:
-      DATABASE_URL: postgresql+asyncpg://postgres:password@db:5432/warehouse_db
-      SECRET_KEY: ${SECRET_KEY:-cambia-esta-clave-en-produccion}
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD requerido}@db:5432/${POSTGRES_DB:-warehouse_db}
+      # Required: generate with `openssl rand -hex 32` and put in .env.
+      SECRET_KEY: ${SECRET_KEY:?SECRET_KEY requerido}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@distrigal.com}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?ADMIN_PASSWORD requerido}
+      CORS_ORIGINS: ${CORS_ORIGINS:-["http://localhost:8000"]}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       GMAIL_CLIENT_ID: ${GMAIL_CLIENT_ID:-}
       GMAIL_CLIENT_SECRET: ${GMAIL_CLIENT_SECRET:-}

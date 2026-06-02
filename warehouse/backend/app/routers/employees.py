@@ -111,6 +111,7 @@ async def list_calendar(
     end_date: Optional[date] = None,
     type: Optional[CalendarEventType] = None,
     db: AsyncSession = Depends(get_db),
+    _: Employee = Depends(get_current_employee),
 ):
     stmt = select(CalendarEvent)
     if start_date:

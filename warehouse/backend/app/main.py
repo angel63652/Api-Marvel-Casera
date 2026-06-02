@@ -15,7 +15,7 @@ from sqlalchemy import select
 
 from app.config import settings
 from app.database import create_tables, AsyncSessionLocal
-from app.auth import hash_password
+from app.auth import hash_password, get_current_employee
 from app.routers import (
     products,
     locations,
@@ -36,8 +36,31 @@ TEMPLATES_DIR = os.path.abspath(
 
 
 async def _create_default_admin() -> None:
-    """Create the bootstrap admin account if no employees exist yet."""
+    """Seed a bootstrap admin if no employees exist yet.
+
+    The password comes from ADMIN_PASSWORD (env). In production (DEBUG=False) we
+    refuse to seed a weak default: if ADMIN_PASSWORD is unset, seeding is skipped
+    and a warning is logged. In development a throwaway default is used.
+    """
+    import logging
     from app.models.employee import Employee, EmployeeRole
+
+    log = logging.getLogger("wms.bootstrap")
+
+    password = settings.ADMIN_PASSWORD
+    if not password:
+        if settings.DEBUG:
+            password = "admin123"
+            log.warning(
+                "ADMIN_PASSWORD no definido: usando contraseña de desarrollo "
+                "'admin123'. NO usar en producción."
+            )
+        else:
+            log.warning(
+                "ADMIN_PASSWORD no definido en producción: no se crea admin "
+                "bootstrap. Define ADMIN_EMAIL/ADMIN_PASSWORD para sembrarlo."
+            )
+            return
 
     async with AsyncSessionLocal() as db:
         result = await db.execute(select(Employee).limit(1))
@@ -48,11 +71,11 @@ async def _create_default_admin() -> None:
             name="Administrador",
             surname="Sistema",
             dni="00000000A",
-            email="admin@distrigal.com",
+            email=settings.ADMIN_EMAIL,
             role=EmployeeRole.ADMIN,
             is_active=True,
             salary_base=0.0,
-            hashed_password=hash_password("admin123"),
+            hashed_password=hash_password(password),
         )
         db.add(admin)
         await db.commit()
@@ -75,23 +98,28 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=settings.CORS_ORIGINS,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type"],
 )
 
 # ---- API routers -----------------------------------------------------------
 API_PREFIX = "/api/v1"
-app.include_router(dashboard.router, prefix=API_PREFIX)
-app.include_router(products.router, prefix=API_PREFIX)
-app.include_router(locations.router, prefix=API_PREFIX)
-app.include_router(movements.router, prefix=API_PREFIX)
-app.include_router(replenishments.router, prefix=API_PREFIX)
-app.include_router(orders.router, prefix=API_PREFIX)
-app.include_router(trucks.router, prefix=API_PREFIX)
+# Routers whose every endpoint requires an authenticated employee. Applied at
+# include time so no sensitive GET (stock, orders, movements, emails…) is ever
+# left public by omission. The `employees` router is the exception: it owns the
+# public `POST /login`, so it guards its own endpoints individually.
+auth_dep = [Depends(get_current_employee)]
+app.include_router(dashboard.router, prefix=API_PREFIX, dependencies=auth_dep)
+app.include_router(products.router, prefix=API_PREFIX, dependencies=auth_dep)
+app.include_router(locations.router, prefix=API_PREFIX, dependencies=auth_dep)
+app.include_router(movements.router, prefix=API_PREFIX, dependencies=auth_dep)
+app.include_router(replenishments.router, prefix=API_PREFIX, dependencies=auth_dep)
+app.include_router(orders.router, prefix=API_PREFIX, dependencies=auth_dep)
+app.include_router(trucks.router, prefix=API_PREFIX, dependencies=auth_dep)
 app.include_router(employees.router, prefix=API_PREFIX)
-app.include_router(emails.router, prefix=API_PREFIX)
+app.include_router(emails.router, prefix=API_PREFIX, dependencies=auth_dep)
 
 # ---- Static files & templates ---------------------------------------------
 if os.path.isdir(STATIC_DIR):
