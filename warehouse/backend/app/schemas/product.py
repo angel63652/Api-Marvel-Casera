@@ -38,6 +38,8 @@ class ProductResponse(ProductBase):
 
     id: int
     current_stock: float
+    reserved_stock: float = 0.0
+    available_stock: float = 0.0
     created_at: datetime
     updated_at: datetime
 

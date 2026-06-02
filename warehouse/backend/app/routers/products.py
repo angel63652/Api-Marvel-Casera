@@ -29,6 +29,8 @@ def _serialize(product: Product) -> dict:
         "unit": product.unit,
         "min_stock": product.min_stock,
         "current_stock": product.current_stock,
+        "reserved_stock": product.reserved_stock or 0.0,
+        "available_stock": (product.current_stock or 0.0) - (product.reserved_stock or 0.0),
         "weight": product.weight,
         "price_cost": product.price_cost,
         "active": product.active,

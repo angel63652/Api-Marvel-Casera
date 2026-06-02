@@ -21,7 +21,7 @@ from app.schemas.order import (
     PickingListItem,
 )
 from app.auth import get_current_employee, require_role
-from app.services import picking_service, stock_service
+from app.services import picking_service, stock_service, reservation_service
 
 router = APIRouter(prefix="/orders", tags=["Órdenes"])
 
@@ -172,6 +172,11 @@ async def create_order(
             )
         )
     await db.flush()
+    # Hold stock for each line (available = current_stock - reserved_stock).
+    for line_in in payload.lines:
+        await reservation_service.reserve(
+            db, line_in.product_id, line_in.quantity_requested, order_id=order.id
+        )
     await db.refresh(order)
     return _serialize(order)
 
@@ -187,6 +192,9 @@ async def update_order_status(
     if order is None:
         raise HTTPException(status_code=404, detail="Orden no encontrada")
     order.status = status
+    # Cancelling/returning frees the order's stock holds.
+    if status in (OrderStatus.CANCELLED, OrderStatus.RETURNED):
+        await reservation_service.release_for_order(db, order_id)
     await db.flush()
     await db.refresh(order)
     return _serialize(order)
@@ -322,6 +330,9 @@ async def confirm_order(
                     line.product_id, line.location_id, -line.quantity_picked, db
                 )
 
+    # Stock has physically left: free this order's holds (CONSUMED).
+    await reservation_service.consume_for_order(db, order_id)
+
     order.conformity_signed = True
     order.conformity_at = datetime.now(timezone.utc)
     order.conformity_notes = payload.conformity_notes
@@ -344,6 +355,8 @@ async def return_order(
         raise HTTPException(status_code=404, detail="Orden no encontrada")
     order.status = OrderStatus.RETURNED
     order.return_reason = payload.return_reason
+    # Free any remaining holds for this order.
+    await reservation_service.release_for_order(db, order_id)
     await db.flush()
     await db.refresh(order)
     return _serialize(order)

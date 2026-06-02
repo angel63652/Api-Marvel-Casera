@@ -117,6 +117,23 @@
   `slowapi`, `aiosqlite` — ya en requirements).
 - **Sprint 1:** quedan solo **R4** (reservas, prerrequisito portal) por mi lado y **R8** (auto-refresh) por el tuyo.
 
+### 2026-06-02 — R4 reservas de stock (HECHO) — SPRINT 1 COMPLETO (backend)
+- **Modelo elegido:** ledger `stock_reservations` (ACTIVE/CONSUMED/RELEASED/EXPIRED, `expires_at` TTL,
+  `order_id`, `source`) + columna cacheada `Product.reserved_stock`. **`available = current_stock − reserved_stock`**.
+- **`reservation_service`**: `reserve`, `release_for_order`, `consume_for_order`, `release_reservation`,
+  `expire_due` (TTL), `get_available`. Todos los ajustes de `reserved_stock` son `UPDATE` atómicos.
+- **Integrado con órdenes internas**:
+  - crear orden → **reserva** por línea (`reserved_stock += qty`).
+  - confirmar → **consume** (stock sale por EXIT y se libera el hold) → `available` consistente.
+  - cancelar/devolver → **libera** el hold.
+- **API**: `ProductResponse` ahora incluye `reserved_stock` y `available_stock` (en `/products`, `/products/{id}`).
+- Migración `c3d4reserv01` (batch; cadena up→base→up OK). **17 tests verdes** (3 nuevos de reservas:
+  crear reserva → available baja; confirmar → stock baja y hold a 0; cancelar → hold liberado).
+- 📌 **Para el portal (P-tasks):** el portal debe reservar con `source="PORTAL_CART"` y `expires_at` (TTL),
+  y leer `available_stock`. La base ya está lista; `expire_due` puede colgarse de un job/endpoint.
+- **Sprint 0 + Sprint 1 backend: COMPLETOS.** Lo único pendiente de Sprint 1 es **R8** (frontend, tu lado).
+  Siguiente fase: **Portal Cliente (P1-P6)** — empezaría por P1 (modelos dominio cliente) cuando me lo confirmes.
+
 <!-- Codex: escribe aquí tus entradas, añadiendo al final de esta sección. -->
 
 ### 2026-06-02 — R6 cola offline picking + SW versionado

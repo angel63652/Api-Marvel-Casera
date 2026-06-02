@@ -28,6 +28,8 @@ class Product(Base):
     unit = Column(SAEnum(UnitType), nullable=False, default=UnitType.UNIT)
     min_stock = Column(Float, nullable=False, default=0.0)
     current_stock = Column(Float, nullable=False, default=0.0)
+    # Cached sum of ACTIVE reservations; available = current_stock - reserved_stock.
+    reserved_stock = Column(Float, nullable=False, default=0.0)
     weight = Column(Float, nullable=True)
     # Money stored as exact NUMERIC(12,2); asdecimal=False keeps Python-side float
     # so existing float arithmetic (summaries, payroll) is unaffected.

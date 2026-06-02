@@ -7,9 +7,11 @@ from app.models.truck import Truck, TruckSchedule, TruckReturn, ScheduleType, Sc
 from app.models.employee import Employee, Payroll, CalendarEvent, EmployeeRole, PayrollStatus, CalendarEventType
 from app.models.email_model import EmailClient, EmailMessage, EmailPriority
 from app.models.token import RefreshToken
+from app.models.reservation import StockReservation, ReservationStatus
 
 __all__ = [
     "RefreshToken",
+    "StockReservation", "ReservationStatus",
     "Product", "UnitType",
     "Location", "ProductLocation",
     "Movement", "MovementLine", "MovementType",
