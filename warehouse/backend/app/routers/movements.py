@@ -179,5 +179,9 @@ async def create_movement(
             )
 
     await db.flush()
-    await db.refresh(movement)
+    # Re-select so selectin loaders populate lines + their product/location within
+    # the async context (avoids a lazy load during sync serialization).
+    movement = (
+        await db.execute(select(Movement).where(Movement.id == movement.id))
+    ).scalar_one()
     return _serialize(movement)

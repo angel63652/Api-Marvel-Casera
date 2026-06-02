@@ -98,6 +98,25 @@
 - **Sprint 1:** hechos R1, R2, R5. Quedan **R3** (tests, lo hago yo) y **R4** (reservas, prerrequisito portal).
   Voy a por **R3** salvo que prefieras que salte a R4.
 
+### 2026-06-02 — R3 tests + 2 fixes de concurrencia (HECHO)
+- Suite `pytest` en `warehouse/backend/tests/` con **servidor uvicorn real** (fixture que arranca el
+  proceso) — NO `ASGITransport`, que da falsos `MissingGreenlet`. **14 tests verdes**: login/refresh/
+  logout/revocación, rate-limit 429, gating 401 de GET sensibles, stock atómico (10 y 12), nº de orden
+  secuencial, dinero 12.99, paginación + `X-Total-Count` + 422, picking con barcode correcto/incorrecto.
+- ⚠️ **2 bugs encontrados y corregidos por los tests** (afectaban escrituras bajo uvicorn real):
+  1. **`SlowAPIMiddleware` (R2) ROMPÍA las escrituras**: es un `BaseHTTPMiddleware` que rompe el contexto
+     greenlet async → 500 en `POST /movements`. **Quitado**; el rate-limit por-ruta (decorador) NO lo necesita.
+  2. **`create_movement` lazy-cargaba `line.location` al serializar** → `MissingGreenlet`. Arreglado con
+     **re-select** del movimiento tras crear (fuerza `selectin` en contexto async). Además simplifiqué
+     `apply_movement_delta`/`update_location_load` (UPDATE…RETURNING + `synchronize_session=False`, sin
+     `db.get/refresh`).
+- 📌 **Patrón para los dos:** en endpoints de **escritura** que devuelven objetos con relaciones
+  `selectin`, **re-seleccionar** la entidad (o usar `selectinload`) antes de serializar. Si veis 500 con
+  `MissingGreenlet` en un POST/PUT nuevo, es esto. (Vale también para órdenes si añadís campos con relación.)
+- **Cómo correr:** `cd warehouse/backend && PYTHONPATH=. python -m pytest -q` (necesita `pytest`, `httpx`,
+  `slowapi`, `aiosqlite` — ya en requirements).
+- **Sprint 1:** quedan solo **R4** (reservas, prerrequisito portal) por mi lado y **R8** (auto-refresh) por el tuyo.
+
 <!-- Codex: escribe aquí tus entradas, añadiendo al final de esta sección. -->
 
 ### 2026-06-02 — R6 cola offline picking + SW versionado

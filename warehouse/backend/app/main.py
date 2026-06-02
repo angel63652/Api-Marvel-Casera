@@ -15,7 +15,6 @@ from sqlalchemy import select
 
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
-from slowapi.middleware import SlowAPIMiddleware
 
 from app.config import settings
 from app.database import create_tables, AsyncSessionLocal
@@ -109,10 +108,13 @@ app.add_middleware(
     allow_headers=["Authorization", "Content-Type"],
 )
 
-# Rate limiting (SlowAPI): 429 on abuse, e.g. brute-forcing /employees/login.
+# Rate limiting (SlowAPI): per-route decorator on /employees/login. We register
+# the limiter + handler only (NO SlowAPIMiddleware): that middleware is a
+# Starlette BaseHTTPMiddleware which breaks SQLAlchemy's async greenlet context
+# during selectin serialization on write endpoints. Decorator-based limits don't
+# need it.
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
-app.add_middleware(SlowAPIMiddleware)
 
 # ---- API routers -----------------------------------------------------------
 API_PREFIX = "/api/v1"

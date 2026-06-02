@@ -61,16 +61,10 @@ async def apply_movement_delta(
         .where(Product.id == product_id)
         .values(current_stock=func.coalesce(Product.current_stock, 0.0) + delta)
         .returning(Product.current_stock)
+        .execution_options(synchronize_session=False)
     )
     row = result.first()
-    if row is None:
-        return 0.0
-    # Keep the identity-mapped instance (if loaded) consistent with the DB.
-    product = await db.get(Product, product_id)
-    if product is not None:
-        await db.refresh(product, attribute_names=["current_stock"])
-    await db.flush()
-    return float(row[0] or 0.0)
+    return float(row[0]) if row and row[0] is not None else 0.0
 
 
 async def check_low_stock(db: AsyncSession) -> list[dict]:
@@ -115,15 +109,10 @@ async def update_location_load(
         .where(Location.id == location_id)
         .values(current_load=case((new_load < 0, 0.0), else_=new_load))
         .returning(Location.current_load)
+        .execution_options(synchronize_session=False)
     )
     row = result.first()
-    if row is None:
-        return 0.0
-    location = await db.get(Location, location_id)
-    if location is not None:
-        await db.refresh(location, attribute_names=["current_load"])
-    await db.flush()
-    return float(row[0] or 0.0)
+    return float(row[0]) if row and row[0] is not None else 0.0
 
 
 async def update_product_location_qty(
