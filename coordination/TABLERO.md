@@ -42,7 +42,7 @@ Ver detalle en `AUDITORIA.md` Â§2-Â§3 y Â§8.
 |----|-------|------|-------|--------|-------|
 | C4 | OAuth Gmail real | backend | â€” | LIBRE | `email_service.sync_gmail` listo |
 | C5 | EnvÃ­o real de notificaciones a oficina (SMTP/Gmail) | backend | â€” | LIBRE | `email_service.notify_office` |
-| C6 | Export Excel (camiones, nÃ³minas) | full | â€” | LIBRE | `openpyxl` ya estÃ¡ |
+| C6 | Export Excel (camiones, nÃ³minas) | backend | **Claude** | EN CURSO (2026-06-02) | `excel_service.py` + endpoints `.../history/export` y `payrolls/report/{y}/{m}/export` (openpyxl) |
 | C7 | AprobaciÃ³n con contraseÃ±a en ajustes de stock | backend | **Claude** | ✅ HECHO (2026-06-02) | `POST /movements/adjustment` (MANAGER, re-verifica password, delta con signo); el genérico rechaza ADJUSTMENT; 43 tests |
 | C10 | Etiquetas de barcode (Pillow) | backend | â€” | LIBRE | |
 | C12 | PaginaciÃ³n frontend (consume R5) | frontend | **Codex** | HECHO (2026-06-02) | productos/ordenes/movimientos/ubicaciones consumen `limit`/`offset` + `X-Total-Count` |
