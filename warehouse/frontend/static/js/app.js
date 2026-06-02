@@ -8,9 +8,13 @@
    API Helper
    ============================================================ */
 async function api(method, path, body = null) {
+  const token = localStorage.getItem('wms_token');
+  const headers = { 'Content-Type': 'application/json', 'Accept': 'application/json' };
+  if (token) headers.Authorization = `Bearer ${token}`;
+
   const opts = {
     method: method.toUpperCase(),
-    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+    headers,
     credentials: 'same-origin',
   };
   if (body !== null) opts.body = JSON.stringify(body);
@@ -19,6 +23,12 @@ async function api(method, path, body = null) {
     const res = await fetch(`/api/v1${path}`, opts);
     const contentType = res.headers.get('Content-Type') || '';
     const isJson = contentType.includes('application/json');
+
+    if (res.status === 401) {
+      clearSession();
+      window.location.replace('/login');
+      throw new Error('Sesión caducada');
+    }
 
     if (!res.ok) {
       let errMsg = `Error ${res.status}: ${res.statusText}`;
@@ -43,6 +53,62 @@ async function api(method, path, body = null) {
     }
     throw err;
   }
+}
+
+/* ============================================================
+   Auth helpers
+   ============================================================ */
+function clearSession() {
+  localStorage.removeItem('wms_token');
+  localStorage.removeItem('wms_user');
+}
+
+function logout() {
+  clearSession();
+  window.location.href = '/login';
+}
+
+function getCurrentUser() {
+  const raw = localStorage.getItem('wms_user');
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw);
+  } catch (_) {
+    clearSession();
+    return null;
+  }
+}
+
+function requireAuth() {
+  if (!localStorage.getItem('wms_token')) {
+    window.location.replace('/login');
+    return false;
+  }
+  return true;
+}
+
+function currentUserInitials(user) {
+  const name = (user?.full_name || `${user?.name || ''} ${user?.surname || ''}`).trim();
+  if (!name) return 'U';
+  return name
+    .split(/\s+/)
+    .slice(0, 2)
+    .map(part => part[0]?.toUpperCase() || '')
+    .join('') || 'U';
+}
+
+function renderCurrentUser() {
+  const user = getCurrentUser();
+  const name = user?.full_name || `${user?.name || ''} ${user?.surname || ''}`.trim() || 'Usuario';
+  const role = user?.role || '';
+  const initials = currentUserInitials(user);
+
+  document.querySelectorAll('[data-current-user-name]').forEach(el => { el.textContent = name; });
+  document.querySelectorAll('[data-current-user-role]').forEach(el => { el.textContent = role; });
+  document.querySelectorAll('[data-current-user-initials]').forEach(el => {
+    el.textContent = initials;
+    el.setAttribute('title', name);
+  });
 }
 
 /* ============================================================
@@ -312,4 +378,5 @@ function stockStatusBadge(current, minimum) {
 document.addEventListener('DOMContentLoaded', () => {
   registerSW();
   highlightActiveNav();
+  renderCurrentUser();
 });

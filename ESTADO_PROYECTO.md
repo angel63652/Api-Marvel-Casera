@@ -157,7 +157,7 @@ Verificado arrancando el servidor con SQLite y `curl`:
 
 ### 🔴 Prioridad ALTA (desbloqueantes)
 
-- [ ] **C1 — Login en el frontend.**
+- [x] **C1 — Login en el frontend.**
   - Crear `frontend/templates/login.html` + ruta `GET /login` en `app/main.py`.
   - En `static/js/app.js`: guardar el JWT en `localStorage`, añadir header
     `Authorization: Bearer <token>` en el `api()` wrapper, redirigir a `/login` si 401.

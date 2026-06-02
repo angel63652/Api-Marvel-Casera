@@ -106,6 +106,11 @@ async def health():
 
 
 # ---- Server-rendered pages -------------------------------------------------
+@app.get("/login", response_class=HTMLResponse, include_in_schema=False)
+async def login_page(request: Request):
+    return templates.TemplateResponse(request, "login.html")
+
+
 PAGES = {
     "/": "dashboard.html",
     "/products": "products.html",
@@ -122,7 +127,7 @@ PAGES = {
 
 def _make_page(template_name: str):
     async def _page(request: Request):
-        return templates.TemplateResponse(template_name, {"request": request})
+        return templates.TemplateResponse(request, template_name)
 
     return _page
 
@@ -140,12 +145,12 @@ for path, template_name in PAGES.items():
 @app.get("/picking/{order_id}", response_class=HTMLResponse, include_in_schema=False)
 async def picking_page(request: Request, order_id: int):
     return templates.TemplateResponse(
-        "picking.html", {"request": request, "order_id": order_id}
+        request, "picking.html", {"order_id": order_id}
     )
 
 
 @app.get("/picking", response_class=HTMLResponse, include_in_schema=False)
 async def picking_index(request: Request):
     return templates.TemplateResponse(
-        "picking.html", {"request": request, "order_id": None}
+        request, "picking.html", {"order_id": None}
     )
