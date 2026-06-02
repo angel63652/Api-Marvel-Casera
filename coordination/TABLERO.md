@@ -31,7 +31,7 @@ Ver detalle en `AUDITORIA.md` §2-§3 y §8.
 | R3 | Tests (`pytest` + `httpx.AsyncClient`): stock, auth, picking (≥60%) | backend | — | LIBRE | `warehouse/backend/tests/` (crear) |
 | R4 | Modelo de **reservas de stock** (`available = físico − reservado`) | backend | — | LIBRE | nuevo `models/`, prerrequisito portal |
 | R5 | Paginación en listados largos | backend | — | LIBRE | `routers/products|orders|movements` |
-| R6 | Cola offline picking a IndexedDB + caché SW versionado | frontend | **Codex** | EN CURSO (2026-06-02) | `warehouse/frontend/static/js/picking.js`, `warehouse/frontend/static/js/sw.js` |
+| R6 | Cola offline picking a IndexedDB + caché SW versionado | frontend | **Codex** | HECHO (2026-06-02) | IndexedDB + migración desde `localStorage`; SW `2026-06-02-r6` |
 
 ## 🟢 Roadmap interno pendiente (de ESTADO_PROYECTO.md)
 

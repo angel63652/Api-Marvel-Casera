@@ -70,6 +70,117 @@ class BarcodeScanner {
 }
 
 /* ============================================================
+   IndexedDB-backed offline queue
+   ============================================================ */
+class PickingOfflineQueue {
+  constructor() {
+    this.dbName = 'wms-picking-offline';
+    this.storeName = 'actions';
+    this.legacyKey = 'wms_picking_queue';
+    this.db = null;
+    this.useFallback = !('indexedDB' in window);
+  }
+
+  async init() {
+    if (this.useFallback) return;
+    try {
+      this.db = await this._openDb();
+      await this._migrateLegacyQueue();
+    } catch (_) {
+      this.db = null;
+      this.useFallback = true;
+    }
+  }
+
+  async list() {
+    if (this.useFallback) return this._fallbackList();
+    const tx = this.db.transaction(this.storeName, 'readonly');
+    const store = tx.objectStore(this.storeName);
+    const items = await this._request(store.getAll());
+    return items.sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+  }
+
+  async enqueue(action) {
+    const record = {
+      ...action,
+      timestamp: action.timestamp || Date.now(),
+    };
+    if (this.useFallback) return this._fallbackEnqueue(record);
+
+    const tx = this.db.transaction(this.storeName, 'readwrite');
+    const store = tx.objectStore(this.storeName);
+    const id = await this._request(store.add(record));
+    return { ...record, id };
+  }
+
+  async remove(id) {
+    if (this.useFallback) return this._fallbackRemove(id);
+    const tx = this.db.transaction(this.storeName, 'readwrite');
+    const store = tx.objectStore(this.storeName);
+    await this._request(store.delete(id));
+  }
+
+  _openDb() {
+    return new Promise((resolve, reject) => {
+      const request = indexedDB.open(this.dbName, 1);
+      request.onupgradeneeded = () => {
+        const db = request.result;
+        if (!db.objectStoreNames.contains(this.storeName)) {
+          const store = db.createObjectStore(this.storeName, {
+            keyPath: 'id',
+            autoIncrement: true,
+          });
+          store.createIndex('by_timestamp', 'timestamp');
+          store.createIndex('by_order', 'orderId');
+        }
+      };
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+  }
+
+  _request(request) {
+    return new Promise((resolve, reject) => {
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+  }
+
+  async _migrateLegacyQueue() {
+    const legacy = this._fallbackList();
+    if (!legacy.length) return;
+    for (const action of legacy) {
+      await this.enqueue(action);
+    }
+    localStorage.removeItem(this.legacyKey);
+  }
+
+  _fallbackList() {
+    try {
+      return JSON.parse(localStorage.getItem(this.legacyKey) || '[]');
+    } catch (_) {
+      return [];
+    }
+  }
+
+  _fallbackEnqueue(action) {
+    const record = {
+      ...action,
+      id: action.id || `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    };
+    const items = this._fallbackList();
+    items.push(record);
+    localStorage.setItem(this.legacyKey, JSON.stringify(items));
+    return record;
+  }
+
+  _fallbackRemove(id) {
+    const items = this._fallbackList().filter(action => action.id !== id);
+    localStorage.setItem(this.legacyKey, JSON.stringify(items));
+  }
+}
+
+/* ============================================================
    PickingManager Class
    ============================================================ */
 class PickingManager {
@@ -79,7 +190,8 @@ class PickingManager {
     this.lines = [];
     this.currentLineIndex = 0;
     this.offlineQueue = [];
-    this._loadOfflineQueue();
+    this.queueStore = new PickingOfflineQueue();
+    this.offlineReady = this._loadOfflineQueue();
 
     this.scanner = new BarcodeScanner({
       onScan: (code) => this.matchBarcode(code),
@@ -94,6 +206,7 @@ class PickingManager {
   /* ---- Load order ---- */
   async loadOrder(orderId) {
     this.orderId = orderId;
+    await this.offlineReady;
     try {
       const lines = await api('GET', `/orders/${orderId}/picking-list`);
       const order = await api('GET', `/orders/${orderId}`);
@@ -134,7 +247,7 @@ class PickingManager {
     const payload = { quantity_picked: qty, observation: notes || null };
 
     if (!navigator.onLine) {
-      this._queueOffline({ type: 'pick', orderId: this.orderId, lineId, payload });
+      await this._queueOffline({ type: 'pick', orderId: this.orderId, lineId, payload });
       this._markLineLocally(lineId, 'picked', qty);
       toast('Sin conexión — guardado localmente', 'warning');
       return;
@@ -146,7 +259,7 @@ class PickingManager {
       this.feedbackSuccess();
       return result;
     } catch (err) {
-      this._queueOffline({ type: 'pick', orderId: this.orderId, lineId, payload });
+      await this._queueOffline({ type: 'pick', orderId: this.orderId, lineId, payload });
       throw err;
     }
   }
@@ -156,7 +269,7 @@ class PickingManager {
     const payload = { observation: notes, status: 'MISSING' };
 
     if (!navigator.onLine) {
-      this._queueOffline({ type: 'observation', orderId: this.orderId, lineId, payload });
+      await this._queueOffline({ type: 'observation', orderId: this.orderId, lineId, payload });
       this._markLineLocally(lineId, 'observed', 0);
       toast('Sin conexión — observación guardada localmente', 'warning');
       return;
@@ -167,7 +280,7 @@ class PickingManager {
       this._markLineLocally(lineId, 'observed', 0);
       return result;
     } catch (err) {
-      this._queueOffline({ type: 'observation', orderId: this.orderId, lineId, payload });
+      await this._queueOffline({ type: 'observation', orderId: this.orderId, lineId, payload });
       throw err;
     }
   }
@@ -227,31 +340,29 @@ class PickingManager {
   }
 
   /* ---- Offline queue ---- */
-  _loadOfflineQueue() {
+  async _loadOfflineQueue() {
     try {
-      const raw = localStorage.getItem('wms_picking_queue');
-      this.offlineQueue = raw ? JSON.parse(raw) : [];
+      await this.queueStore.init();
+      this.offlineQueue = await this.queueStore.list();
     } catch (_) { this.offlineQueue = []; }
+    this._emitQueueUpdated();
   }
 
-  _saveOfflineQueue() {
-    try {
-      localStorage.setItem('wms_picking_queue', JSON.stringify(this.offlineQueue));
-    } catch (_) {}
-  }
-
-  _queueOffline(action) {
-    action.timestamp = Date.now();
-    this.offlineQueue.push(action);
-    this._saveOfflineQueue();
+  async _queueOffline(action) {
+    await this.offlineReady;
+    await this.queueStore.enqueue(action);
+    this.offlineQueue = await this.queueStore.list();
+    this._emitQueueUpdated();
+    this._registerBackgroundSync();
   }
 
   async _syncOfflineQueue() {
+    await this.offlineReady;
+    this.offlineQueue = await this.queueStore.list();
+    this._emitQueueUpdated();
     if (!this.offlineQueue.length) return;
 
     const pending = [...this.offlineQueue];
-    this.offlineQueue = [];
-    this._saveOfflineQueue();
 
     let synced = 0, failed = 0;
     for (const action of pending) {
@@ -261,16 +372,30 @@ class PickingManager {
         } else if (action.type === 'observation') {
           await api('POST', `/orders/${action.orderId}/lines/${action.lineId}/observe`, action.payload);
         }
+        await this.queueStore.remove(action.id);
         synced++;
       } catch (_) {
-        this.offlineQueue.push(action);
         failed++;
       }
     }
-    this._saveOfflineQueue();
+    this.offlineQueue = await this.queueStore.list();
+    this._emitQueueUpdated();
 
     if (synced > 0) toast(`${synced} acción(es) sincronizadas`, 'success');
     if (failed > 0) toast(`${failed} acción(es) no pudieron sincronizarse`, 'error');
+  }
+
+  _emitQueueUpdated() {
+    document.dispatchEvent(new CustomEvent('picking:queueUpdated', {
+      detail: { count: this.offlineQueue.length },
+    }));
+  }
+
+  _registerBackgroundSync() {
+    if (!('serviceWorker' in navigator) || !('SyncManager' in window)) return;
+    navigator.serviceWorker.ready
+      .then(registration => registration.sync.register('sync-picking-queue'))
+      .catch(() => {});
   }
 
   /* ---- Local state mutation ---- */
@@ -354,6 +479,7 @@ function pickingPageData() {
     showCelebration: false,
     loading: true,
     submitting: false,
+    offlineQueueCountValue: 0,
     manager: null,
 
     async init() {
@@ -383,10 +509,20 @@ function pickingPageData() {
         this.showConformity = true;
       });
 
+      document.addEventListener('picking:queueUpdated', (e) => {
+        this.offlineQueueCountValue = e.detail.count || 0;
+      });
+
       // Sync offline queue when back online
       window.addEventListener('online', () => {
         toast('Conexión restaurada — sincronizando...', 'info');
         this.manager._syncOfflineQueue();
+      });
+
+      navigator.serviceWorker?.addEventListener('message', (event) => {
+        if (event.data?.type === 'SYNC_PICKING_QUEUE') {
+          this.manager._syncOfflineQueue();
+        }
       });
 
       try {
@@ -395,6 +531,7 @@ function pickingPageData() {
         this.lines = [...this.manager.lines];
         this.currentLine = this.manager.currentLine();
         this.qtyPicked = this.currentLine?.quantity_needed || 1;
+        this.offlineQueueCountValue = this.manager.offlineQueue.length;
       } catch (_) {
         toast('No se pudo cargar la orden', 'error');
       } finally {
@@ -491,9 +628,7 @@ function pickingPageData() {
     get pickedCount() { return this.manager ? this.manager.pickedCount() : 0; },
     get totalCount() { return this.manager ? this.manager.totalCount() : 0; },
     get allDone() { return this.manager ? this.manager.allProcessed() : false; },
-    get offlineQueueCount() {
-      try { return JSON.parse(localStorage.getItem('wms_picking_queue') || '[]').length; } catch(_) { return 0; }
-    },
+    get offlineQueueCount() { return this.offlineQueueCountValue; },
 
     lineStatusIcon(status) {
       if (status === 'picked') return '✓';
@@ -520,4 +655,5 @@ function pickingPageData() {
 // Expose globally
 window.PickingManager = PickingManager;
 window.BarcodeScanner = BarcodeScanner;
+window.PickingOfflineQueue = PickingOfflineQueue;
 window.pickingPageData = pickingPageData;

@@ -50,3 +50,9 @@
 - **Pendiente Sprint 0:** queda **R6 (frontend, Codex)**. Yo sigo con Sprint 1 backend (R1-R5).
 
 <!-- Codex: escribe aquí tus entradas, añadiendo al final de esta sección. -->
+
+### 2026-06-02 — R6 cola offline picking + SW versionado
+- Claim respetado: solo `warehouse/frontend/static/js/picking.js` y `warehouse/frontend/static/js/sw.js`.
+- La cola offline de picking pasa a IndexedDB (`wms-picking-offline`) y migra automaticamente la cola legacy `wms_picking_queue` desde `localStorage`.
+- El service worker queda versionado como `2026-06-02-r6`, limpia caches `wms-*` antiguas y cachea assets locales + CDN con timeout para no bloquear install.
+- Verificacion: `node --check` en ambos JS, smoke Playwright de IndexedDB y smoke Playwright de registro SW/cache versionada.
