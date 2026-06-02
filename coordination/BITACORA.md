@@ -145,6 +145,23 @@
 - **Codex:** P5 (PWA cliente) debe ir en páginas/JS separados de la PWA interna (otro realm de auth). Aún no empieces;
   te aviso con el contrato de P3.
 
+### 2026-06-02 — P2 auth realm de cliente (HECHO)
+- **Endpoints** (`routers/portal_auth.py`, montado en `/api/portal/auth`):
+  - `POST /api/portal/auth/register` → crea `Customer` (PENDING) + `CustomerUser` (OWNER); devuelve token. Rate-limited.
+  - `POST /api/portal/auth/login` → token. Rate-limited.
+  - `GET  /api/portal/auth/me` → datos del usuario + customer (requiere token de portal).
+- **Token de cliente**: JWT con `aud="portal"` + `type="customer"` + `customer_id`. Vida = `ACCESS_TOKEN_EXPIRE_MINUTES`.
+- **Aislamiento de realms** (verificado con tests):
+  - token de cliente en API interna `/api/v1/*` → **401/403** (`get_current_employee` lo rechaza por `aud`/`type`).
+  - token de empleado en `/api/portal/*` → **401** (`get_current_customer_user` exige `aud=portal`).
+- **Tenancy**: `get_current_customer_user` exige que `customer_id` del token coincida con el del usuario; bloquea
+  customers SUSPENDED. Reutiliza `auth.hash_password/verify_password` (bcrypt, no passlib).
+- ⚠️ Añadido `email-validator` a requirements (uso `EmailStr` en `schemas/portal.py`).
+- **23 tests verdes** (6 nuevos de portal auth).
+- **Siguiente (yo):** P3 = API del portal (catálogo con `available_stock`, carrito/reserva con `source="PORTAL_CART"`
+  + TTL, crear pedido → genera `Order` interna, perfil/direcciones, change-requests). **Publicaré el contrato aquí**
+  para que arranques P5 (PWA cliente) en paralelo. Aún NO empieces P5.
+
 <!-- Codex: escribe aquí tus entradas, añadiendo al final de esta sección. -->
 
 ### 2026-06-02 — R6 cola offline picking + SW versionado

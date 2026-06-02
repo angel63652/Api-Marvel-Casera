@@ -106,6 +106,7 @@ async def get_current_employee(
             headers={"WWW-Authenticate": "Bearer"},
         )
     payload = verify_token(token)
+    reject_if_customer(payload)
     employee_id = payload.get("sub")
     if employee_id is None:
         raise HTTPException(
@@ -121,6 +122,78 @@ async def get_current_employee(
             detail="Empleado no encontrado o inactivo",
         )
     return employee
+
+
+def reject_if_customer(payload: dict) -> None:
+    """Guard: an employee endpoint must never accept a portal (customer) token."""
+    if payload.get("type") == "customer":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Token de cliente no válido para esta API",
+        )
+
+
+# ---- Client portal auth ----------------------------------------------------
+def create_customer_token(customer_user_id: int, customer_id: int) -> str:
+    """Access token for the client portal (separate realm via aud/type)."""
+    expire = datetime.now(timezone.utc) + timedelta(
+        minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES
+    )
+    return jwt.encode(
+        {
+            "sub": str(customer_user_id),
+            "customer_id": customer_id,
+            "type": "customer",
+            "aud": "portal",
+            "exp": expire,
+        },
+        settings.SECRET_KEY,
+        algorithm=settings.ALGORITHM,
+    )
+
+
+async def get_current_customer_user(
+    token: Optional[str] = Depends(oauth2_scheme),
+    db: AsyncSession = Depends(get_db),
+):
+    """Resolve the authenticated portal user from a customer token.
+
+    Enforces the portal realm (type=customer) and tenancy (customer_id on token
+    must match the user's customer). Returns the CustomerUser.
+    """
+    from app.models.customer import CustomerUser, Customer, CustomerStatus
+
+    if not token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="No autenticado",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    try:
+        payload = jwt.decode(
+            token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM],
+            audience="portal",
+        )
+    except JWTError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token inválido o expirado",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    if payload.get("type") != "customer":
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token no válido")
+
+    user_id = payload.get("sub")
+    user = await db.get(CustomerUser, int(user_id)) if user_id else None
+    if user is None or not user.is_active:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Usuario inactivo")
+    if user.customer_id != payload.get("customer_id"):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token inconsistente")
+
+    customer = await db.get(Customer, user.customer_id)
+    if customer is None or customer.status == CustomerStatus.SUSPENDED:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Cuenta suspendida")
+    return user
 
 
 def require_role(*roles: str):

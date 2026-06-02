@@ -30,6 +30,7 @@ from app.routers import (
     employees,
     emails,
     dashboard,
+    portal_auth,
 )
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -132,6 +133,9 @@ app.include_router(orders.router, prefix=API_PREFIX, dependencies=auth_dep)
 app.include_router(trucks.router, prefix=API_PREFIX, dependencies=auth_dep)
 app.include_router(employees.router, prefix=API_PREFIX)
 app.include_router(emails.router, prefix=API_PREFIX, dependencies=auth_dep)
+
+# ---- Client portal (separate auth realm; routers carry their own prefix) ----
+app.include_router(portal_auth.router)
 
 # ---- Static files & templates ---------------------------------------------
 if os.path.isdir(STATIC_DIR):
