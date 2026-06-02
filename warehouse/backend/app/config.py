@@ -31,7 +31,12 @@ class Settings(BaseSettings):
     )
 
     ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24  # 24 hours
+    # Short-lived access token; long-lived revocable refresh token.
+    # 60 min interim; drop to 15-30 once the frontend wires auto-refresh.
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
+    REFRESH_TOKEN_EXPIRE_DAYS: int = 30
+    # Rate limit for the login endpoint (SlowAPI syntax).
+    LOGIN_RATE_LIMIT: str = "10/minute"
 
     # CORS: explicit allowlist (never "*" together with credentials).
     CORS_ORIGINS: list[str] = Field(

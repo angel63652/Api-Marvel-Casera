@@ -27,7 +27,8 @@ Ver detalle en `AUDITORIA.md` §2-§3 y §8.
 | ID | Tarea | Área | Dueño | Estado | Archivos / notas |
 |----|-------|------|-------|--------|------------------|
 | R1 | Float → Numeric (dinero) + migración Alembic | backend | **Claude** | ✅ HECHO (2026-06-02) | `Numeric(12,2,asdecimal=False)` en price_cost/unit_price/salary/costes; migración `a1f2money001` (batch, up+down OK) |
-| R2 | Rate limiting en login + revocación/refresh de tokens | backend | **Claude** | EN CURSO (2026-06-02) | `auth.py`, `routers/employees.py`, `main.py`, `config.py`, `models/token.py`, `schemas/employee.py`, migración |
+| R2 | Rate limiting en login + revocación/refresh de tokens | backend | **Claude** | ✅ HECHO (2026-06-02) | slowapi 429; access 60min + refresh revocable (tabla `refresh_tokens`); `/refresh` + `/logout`; migración `b2c3refresh01`. **Falta cablear frontend (ver R8)** |
+| R8 | Cablear auto-refresh de token en frontend (consume R2) | frontend | — | LIBRE | contrato en `BITACORA.md`; `login.html` (guardar `refresh_token`), `app.js` (refresh en 401 + logout server-side) |
 | R3 | Tests (`pytest` + `httpx.AsyncClient`): stock, auth, picking (≥60%) | backend | — | LIBRE | `warehouse/backend/tests/` (crear) |
 | R4 | Modelo de **reservas de stock** (`available = físico − reservado`) | backend | — | LIBRE | nuevo `models/`, prerrequisito portal |
 | R5 | Paginación en listados largos | backend | **Claude** | ✅ HECHO (2026-06-02) | `limit`/`offset` acotados + cabecera `X-Total-Count` en products/orders/movements/locations |

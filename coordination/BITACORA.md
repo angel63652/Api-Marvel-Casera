@@ -72,6 +72,32 @@
 - **Sprint 1 restante:** R2 (rate-limit + refresh tokens) y R4 (reservas) — **necesito tu enfoque**.
   R3 (tests) lo puedo hacer yo: usaré servidor uvicorn real, no `ASGITransport` (por el falso greenlet).
 
+### 2026-06-02 — R2 rate limiting + refresh tokens (HECHO, backend)
+- **Rate limit** (slowapi): `POST /employees/login` limitado por IP (`LOGIN_RATE_LIMIT`, def `10/minute`).
+  Verificado: el exceso devuelve **429**.
+- **Refresh tokens**: el access token pasa a **60 min** (config `ACCESS_TOKEN_EXPIRE_MINUTES`; bajaremos a
+  15-30 cuando el frontend cablee auto-refresh). El refresh token es revocable (tabla `refresh_tokens`).
+- **Nuevos endpoints** (verificados e2e bajo uvicorn):
+  - `POST /api/v1/employees/login` → ahora devuelve `{access_token, refresh_token, token_type, employee}`.
+  - `POST /api/v1/employees/refresh`  body `{"refresh_token": "..."}` → `{access_token, token_type}`.
+  - `POST /api/v1/employees/logout`   body `{"refresh_token": "..."}` → `{detail}` (revoca; idempotente).
+- Migración `b2c3refresh01` (tabla `refresh_tokens`). Cadena up→base→up verificada.
+
+#### 📜 CONTRATO PARA CODEX → tarea **R8** (frontend, consume R2)
+1. **`login.html`**: al hacer login, guardar también el refresh:
+   `localStorage.setItem('wms_refresh', data.refresh_token)` (además de `wms_token`/`wms_user`).
+2. **`app.js` → `api()`**: en respuesta **401**, antes de redirigir a `/login`, intentar UNA vez:
+   - `POST /api/v1/employees/refresh` con `{refresh_token: localStorage.wms_refresh}`.
+   - Si responde 200: `localStorage.setItem('wms_token', nuevo.access_token)` y **reintentar la petición original** una vez.
+   - Si falla (401): `clearSession()` + redirigir a `/login` (comportamiento actual).
+3. **`app.js` → `logout()`**: antes de limpiar, llamar `POST /api/v1/employees/logout` con el `wms_refresh`
+   (para revocar en servidor), y luego borrar `wms_token`/`wms_user`/`wms_refresh` y redirigir.
+4. Cuidado con bucles: no intentes refresh para las llamadas a `/login` ni `/refresh` (evita recursión).
+- Cuando R8 esté hecho, avísame y bajo `ACCESS_TOKEN_EXPIRE_MINUTES` a 15-30.
+
+- **Sprint 1:** hechos R1, R2, R5. Quedan **R3** (tests, lo hago yo) y **R4** (reservas, prerrequisito portal).
+  Voy a por **R3** salvo que prefieras que salte a R4.
+
 <!-- Codex: escribe aquí tus entradas, añadiendo al final de esta sección. -->
 
 ### 2026-06-02 — R6 cola offline picking + SW versionado

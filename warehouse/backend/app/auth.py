@@ -10,6 +10,7 @@ Role hierarchy used across the warehouse:
 - PICKER   : warehouse operator (picking)
 - DRIVER   : truck driver (routes, deliveries)
 """
+import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
@@ -65,6 +66,33 @@ def verify_token(token: str) -> dict:
             detail="Token inválido o expirado",
             headers={"WWW-Authenticate": "Bearer"},
         )
+
+
+def create_refresh_token(employee_id: int) -> tuple[str, str, datetime]:
+    """Build a refresh JWT. Returns (token, jti, expires_at).
+
+    The `jti` is stored server-side so the token can be revoked.
+    """
+    jti = uuid.uuid4().hex
+    expires_at = datetime.now(timezone.utc) + timedelta(
+        days=settings.REFRESH_TOKEN_EXPIRE_DAYS
+    )
+    token = jwt.encode(
+        {"sub": str(employee_id), "jti": jti, "type": "refresh", "exp": expires_at},
+        settings.SECRET_KEY,
+        algorithm=settings.ALGORITHM,
+    )
+    return token, jti, expires_at
+
+
+def decode_refresh_token(token: str) -> dict:
+    """Decode and validate a refresh JWT (signature, expiry, type)."""
+    payload = verify_token(token)
+    if payload.get("type") != "refresh":
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Token de refresco inválido"
+        )
+    return payload
 
 
 async def get_current_employee(

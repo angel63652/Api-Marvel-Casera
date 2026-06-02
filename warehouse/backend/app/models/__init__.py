@@ -6,8 +6,10 @@ from app.models.order import Order, OrderLine, OrderStatus, OrderLineStatus
 from app.models.truck import Truck, TruckSchedule, TruckReturn, ScheduleType, ScheduleStatus
 from app.models.employee import Employee, Payroll, CalendarEvent, EmployeeRole, PayrollStatus, CalendarEventType
 from app.models.email_model import EmailClient, EmailMessage, EmailPriority
+from app.models.token import RefreshToken
 
 __all__ = [
+    "RefreshToken",
     "Product", "UnitType",
     "Location", "ProductLocation",
     "Movement", "MovementLine", "MovementType",

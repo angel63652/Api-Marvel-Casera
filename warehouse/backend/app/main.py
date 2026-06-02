@@ -13,9 +13,14 @@ from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse
 from sqlalchemy import select
 
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
+
 from app.config import settings
 from app.database import create_tables, AsyncSessionLocal
 from app.auth import hash_password, get_current_employee
+from app.limiter import limiter
 from app.routers import (
     products,
     locations,
@@ -103,6 +108,11 @@ app.add_middleware(
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type"],
 )
+
+# Rate limiting (SlowAPI): 429 on abuse, e.g. brute-forcing /employees/login.
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+app.add_middleware(SlowAPIMiddleware)
 
 # ---- API routers -----------------------------------------------------------
 API_PREFIX = "/api/v1"

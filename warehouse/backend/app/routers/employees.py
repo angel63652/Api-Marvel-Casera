@@ -1,10 +1,12 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Optional
 from datetime import datetime, timezone, date
 
 from app.database import get_db
+from app.config import settings
+from app.limiter import limiter
 from app.models.employee import (
     Employee,
     Payroll,
@@ -12,6 +14,7 @@ from app.models.employee import (
     PayrollStatus,
     CalendarEventType,
 )
+from app.models.token import RefreshToken
 from app.schemas.employee import (
     EmployeeCreate,
     EmployeeUpdate,
@@ -23,16 +26,28 @@ from app.schemas.employee import (
     CalendarEventResponse,
     LoginRequest,
     TokenResponse,
+    RefreshRequest,
+    AccessTokenResponse,
 )
 from app.auth import (
     hash_password,
     verify_password,
     create_access_token,
+    create_refresh_token,
+    decode_refresh_token,
     get_current_employee,
     require_role,
 )
 
 router = APIRouter(prefix="/employees", tags=["Empleados"])
+
+
+async def _issue_refresh_token(employee_id: int, db: AsyncSession) -> str:
+    """Create and persist a refresh token for an employee."""
+    token, jti, expires_at = create_refresh_token(employee_id)
+    db.add(RefreshToken(jti=jti, employee_id=employee_id, expires_at=expires_at))
+    await db.flush()
+    return token
 
 MONTH_NAMES = [
     "", "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
@@ -85,7 +100,10 @@ def _payroll_resp(p: Payroll) -> PayrollResponse:
 
 # ---- Auth ------------------------------------------------------------------
 @router.post("/login", response_model=TokenResponse)
-async def login(payload: LoginRequest, db: AsyncSession = Depends(get_db)):
+@limiter.limit(settings.LOGIN_RATE_LIMIT)
+async def login(
+    request: Request, payload: LoginRequest, db: AsyncSession = Depends(get_db)
+):
     result = await db.execute(select(Employee).where(Employee.email == payload.email))
     employee = result.scalar_one_or_none()
     if employee is None or not verify_password(payload.password, employee.hashed_password):
@@ -93,10 +111,54 @@ async def login(payload: LoginRequest, db: AsyncSession = Depends(get_db)):
     if not employee.is_active:
         raise HTTPException(status_code=403, detail="Empleado inactivo")
     role = employee.role.value if hasattr(employee.role, "value") else employee.role
-    token = create_access_token({"sub": str(employee.id), "role": role})
+    access = create_access_token({"sub": str(employee.id), "role": role})
+    refresh = await _issue_refresh_token(employee.id, db)
     return TokenResponse(
-        access_token=token, token_type="bearer", employee=_emp_resp(employee)
+        access_token=access,
+        refresh_token=refresh,
+        token_type="bearer",
+        employee=_emp_resp(employee),
     )
+
+
+@router.post("/refresh", response_model=AccessTokenResponse)
+async def refresh_token(payload: RefreshRequest, db: AsyncSession = Depends(get_db)):
+    """Exchange a valid, non-revoked refresh token for a new access token."""
+    data = decode_refresh_token(payload.refresh_token)
+    jti = data.get("jti")
+    employee_id = data.get("sub")
+    if not jti or not employee_id:
+        raise HTTPException(status_code=401, detail="Token de refresco inválido")
+
+    result = await db.execute(select(RefreshToken).where(RefreshToken.jti == jti))
+    stored = result.scalar_one_or_none()
+    if stored is None or stored.revoked:
+        raise HTTPException(status_code=401, detail="Sesión revocada o inexistente")
+
+    employee = await db.get(Employee, int(employee_id))
+    if employee is None or not employee.is_active:
+        raise HTTPException(status_code=401, detail="Empleado no encontrado o inactivo")
+
+    role = employee.role.value if hasattr(employee.role, "value") else employee.role
+    access = create_access_token({"sub": str(employee.id), "role": role})
+    return AccessTokenResponse(access_token=access, token_type="bearer")
+
+
+@router.post("/logout")
+async def logout(payload: RefreshRequest, db: AsyncSession = Depends(get_db)):
+    """Revoke a refresh token (server-side logout). Idempotent."""
+    try:
+        data = decode_refresh_token(payload.refresh_token)
+    except HTTPException:
+        return {"detail": "Sesión cerrada"}
+    jti = data.get("jti")
+    if jti:
+        result = await db.execute(select(RefreshToken).where(RefreshToken.jti == jti))
+        stored = result.scalar_one_or_none()
+        if stored is not None:
+            stored.revoked = True
+            await db.flush()
+    return {"detail": "Sesión cerrada"}
 
 
 @router.get("/me", response_model=EmployeeResponse)
