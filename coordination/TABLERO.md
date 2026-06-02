@@ -30,7 +30,7 @@ Ver detalle en `AUDITORIA.md` §2-§3 y §8.
 | R2 | Rate limiting en login + revocación/refresh de tokens | backend | — | LIBRE | `auth.py`, `routers/employees.py` |
 | R3 | Tests (`pytest` + `httpx.AsyncClient`): stock, auth, picking (≥60%) | backend | — | LIBRE | `warehouse/backend/tests/` (crear) |
 | R4 | Modelo de **reservas de stock** (`available = físico − reservado`) | backend | — | LIBRE | nuevo `models/`, prerrequisito portal |
-| R5 | Paginación en listados largos | backend | — | LIBRE | `routers/products|orders|movements` |
+| R5 | Paginación en listados largos | backend | **Claude** | EN CURSO (2026-06-02) | `routers/products|orders|movements|locations` |
 | R6 | Cola offline picking a IndexedDB + caché SW versionado | frontend | **Codex** | HECHO (2026-06-02) | IndexedDB + migración desde `localStorage`; SW `2026-06-02-r6` |
 
 ## 🟢 Roadmap interno pendiente (de ESTADO_PROYECTO.md)
