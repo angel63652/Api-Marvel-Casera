@@ -163,7 +163,7 @@ Verificado arrancando el servidor con SQLite y `curl`:
     `Authorization: Bearer <token>` en el `api()` wrapper, redirigir a `/login` si 401.
   - Mostrar usuario logueado + botón logout en `base.html`.
 
-- [ ] **C2 — Conectar las páginas SSR con sus endpoints reales.**
+- [x] **C2 — Conectar las páginas SSR con sus endpoints reales.**
   - Revisar cada plantilla en `frontend/templates/` y verificar que los `fetch`
     apuntan a rutas existentes de la sección 5. Los agentes generaron el HTML pero
     no se ha validado el cableado contra la API real.

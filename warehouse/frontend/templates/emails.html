@@ -260,15 +260,18 @@ function emailsData() {
     async fetchEmails() {
       this.loading = true;
       try {
-        const params = new URLSearchParams({ folder: this.selectedFolder });
-        if (this.emailSearch) params.set('search', this.emailSearch);
-        const data = await api('GET', `/emails?${params}`);
-        this.emails = data.items || data || [];
+        const params = new URLSearchParams();
+        if (this.selectedFolder.startsWith('client_')) params.set('customer_id', this.selectedFolder.replace('client_', ''));
+        const data = await api('GET', `/emails/messages?${params}`);
+        const needle = this.emailSearch.toLowerCase();
+        this.emails = (data.items || data || [])
+          .map(e => this.normalizeEmail(e))
+          .filter(e => !needle || [e.subject, e.from_email, e.ai_summary].some(v => String(v || '').toLowerCase().includes(needle)));
       } catch (_) {} finally { this.loading = false; }
     },
 
     async fetchClientConfigs() {
-      try { const data = await api('GET', '/email-clients'); this.clientConfigs = data.items || data || []; } catch (_) {}
+      try { const data = await api('GET', '/emails/clients'); this.clientConfigs = (data.items || data || []).map(c => this.normalizeClient(c)); } catch (_) {}
     },
 
     selectFolder(folder) { this.selectedFolder = folder; this.selectedEmail = null; this.fetchEmails(); },
@@ -277,7 +280,7 @@ function emailsData() {
       this.selectedEmail = email;
       if (!email.read) {
         email.read = true;
-        api('PATCH', `/emails/${email.id}`, { read: true }).catch(() => {});
+        api('POST', `/emails/messages/${email.id}/read`).catch(() => {});
       }
     },
 
@@ -285,7 +288,7 @@ function emailsData() {
       this.syncing = true;
       try {
         const result = await api('POST', '/emails/sync');
-        const count = result?.new_emails || 0;
+        const count = result?.synced_count || 0;
         toast(`Sincronización completada. ${count} correo(s) nuevos.`, 'success');
         await this.fetchEmails();
       } catch (_) {} finally { this.syncing = false; }
@@ -293,10 +296,36 @@ function emailsData() {
 
     async notifyOffice(email) {
       try {
-        await api('POST', `/emails/${email.id}/notify-office`);
+        const user = getCurrentUser();
+        await api('POST', `/emails/messages/${email.id}/notify`, { staff_emails: [user?.email || 'oficina@distrigal.local'] });
         email.notified = true;
         toast('Oficina notificada correctamente', 'success');
       } catch (_) {}
+    },
+
+    normalizeEmail(e) {
+      return {
+        ...e,
+        read: e.read ?? e.is_read ?? false,
+        notified: e.notified ?? e.is_notified ?? false,
+        from_name: e.from_name || e.from_email,
+        ai_priority: e.ai_priority ? statusKey(e.ai_priority) : null,
+        ai_classified: Boolean(e.ai_category || e.ai_summary || e.ai_priority),
+      };
+    },
+    normalizeClient(c) {
+      return {
+        ...c,
+        name: c.name || c.customer_name,
+        email: c.email || c.customer_email,
+      };
+    },
+    clientPayload() {
+      return {
+        customer_name: this.clientForm.name,
+        customer_email: this.clientForm.email,
+        folder_name: this.clientForm.folder_name || this.clientForm.name,
+      };
     },
 
     openClientModal() { this.editClientId=null; this.clientForm={name:'',email:'',folder_name:''}; this.showClientModal=true; },
@@ -304,14 +333,15 @@ function emailsData() {
     async saveClientConfig() {
       if(this.submitting)return; this.submitting=true;
       try {
-        if(this.editClientId){await api('PUT',`/email-clients/${this.editClientId}`,this.clientForm);toast('Cliente actualizado','success');}
-        else{await api('POST','/email-clients',this.clientForm);toast('Cliente añadido','success');}
+        const payload = this.clientPayload();
+        if(this.editClientId){await api('PUT',`/emails/clients/${this.editClientId}`,payload);toast('Cliente actualizado','success');}
+        else{await api('POST','/emails/clients',payload);toast('Cliente añadido','success');}
         this.showClientModal=false; await this.fetchClientConfigs();
       }catch(_){}finally{this.submitting=false;}
     },
     async deleteClientConfig(id) {
       if(!await confirmDialog('¿Eliminar esta configuración de cliente?'))return;
-      try{await api('DELETE',`/email-clients/${id}`);toast('Cliente eliminado','success');await this.fetchClientConfigs();}catch(_){}
+      try{await api('PUT',`/emails/clients/${id}`,{is_active:false});toast('Cliente desactivado','success');await this.fetchClientConfigs();}catch(_){}
     },
 
     priorityLabel(p) { return {high:'Alta',medium:'Media',low:'Baja'}[p] || p || ''; },

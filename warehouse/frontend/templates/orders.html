@@ -13,13 +13,11 @@
     </div>
     <select class="form-input w-auto" x-model="filterStatus" @change="fetchOrders()">
       <option value="">Todos los estados</option>
-      <option value="draft">Borrador</option>
-      <option value="pending">Pendiente</option>
-      <option value="picking">En Picking</option>
-      <option value="completed">Completado</option>
-      <option value="confirmed">Confirmado</option>
-      <option value="cancelled">Cancelado</option>
-      <option value="returned">Devuelto</option>
+      <option value="PENDING">Pendiente</option>
+      <option value="PICKING">En Picking</option>
+      <option value="COMPLETED">Completado</option>
+      <option value="CANCELLED">Cancelado</option>
+      <option value="RETURNED">Devuelto</option>
     </select>
     <input type="date" class="form-input w-auto" x-model="filterDate" @change="fetchOrders()" title="Filtrar por fecha">
     <button @click="openModal()" class="flex items-center gap-2 px-4 py-2 bg-blue-700 hover:bg-blue-800 text-white text-sm font-semibold rounded-lg transition-colors">
@@ -60,23 +58,20 @@
                 <span class="text-sm font-semibold text-gray-700" x-text="(order.lines_count || order.lines?.length || 0)"></span>
               </td>
               <td class="px-4 py-3 text-center" data-label="Estado" x-html="statusBadge(order.status)"></td>
-              <td class="px-4 py-3 text-xs text-gray-600 hidden lg:table-cell" data-label="Asignado a" x-text="order.assigned_to || '—'"></td>
+              <td class="px-4 py-3 text-xs text-gray-600 hidden lg:table-cell" data-label="Asignado a" x-text="order.buyer_name || '—'"></td>
               <td class="px-4 py-3" data-label="Acciones">
                 <div class="flex items-center justify-center gap-1 flex-wrap">
                   <a :href="'/orders/' + order.id" class="px-2 py-1 text-xs font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded transition-colors">Ver</a>
-                  <template x-if="order.status === 'pending'">
+                  <template x-if="statusKey(order.status) === 'pending'">
                     <button @click="startPicking(order.id)" class="px-2 py-1 text-xs font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 rounded transition-colors">Iniciar Picking</button>
                   </template>
-                  <template x-if="order.status === 'picking'">
+                  <template x-if="statusKey(order.status) === 'picking'">
                     <a :href="'/picking?order_id=' + order.id" class="px-2 py-1 text-xs font-medium text-indigo-700 bg-indigo-50 hover:bg-indigo-100 rounded transition-colors">Ver Picking</a>
                   </template>
-                  <template x-if="order.status === 'completed'">
-                    <button @click="confirmOrder(order.id)" class="px-2 py-1 text-xs font-medium text-green-700 bg-green-50 hover:bg-green-100 rounded transition-colors">Confirmar</button>
-                  </template>
-                  <template x-if="['confirmed','completed'].includes(order.status)">
+                  <template x-if="['completed'].includes(statusKey(order.status))">
                     <button @click="returnOrder(order.id)" class="px-2 py-1 text-xs font-medium text-orange-700 bg-orange-50 hover:bg-orange-100 rounded transition-colors">Devolver</button>
                   </template>
-                  <template x-if="!['picking','completed','confirmed'].includes(order.status)">
+                  <template x-if="!['picking','completed','cancelled','returned'].includes(statusKey(order.status))">
                     <button @click="cancelOrder(order.id)" class="px-2 py-1 text-xs font-medium text-red-700 bg-red-50 hover:bg-red-100 rounded transition-colors">Cancelar</button>
                   </template>
                 </div>
@@ -221,9 +216,8 @@ function ordersData() {
       this.loading = true;
       try {
         const params = new URLSearchParams({ page: this.currentPage, page_size: 20 });
-        if (this.search) params.set('search', this.search);
+        if (this.search) params.set('customer', this.search);
         if (this.filterStatus) params.set('status', this.filterStatus);
-        if (this.filterDate) params.set('date', this.filterDate);
         const data = await api('GET', `/orders?${params}`);
         this.orders = data.items || data || [];
         this.totalPages = data.total_pages || 1;
@@ -245,17 +239,47 @@ function ordersData() {
 
     async lookupProductLine(line) {
       if (!line.product_niu) return;
+      const q = encodeURIComponent(line.product_niu);
       try {
-        const prod = await api('GET', `/products/lookup?q=${encodeURIComponent(line.product_niu)}`);
-        if (prod) { line.product_name = prod.name; if (!line.unit_price) line.unit_price = prod.price || 0; }
+        const data = await api('GET', `/products?search=${q}`);
+        const products = data.items || data || [];
+        const needle = line.product_niu.toLowerCase();
+        const prod = products.find(p =>
+          String(p.niu || '').toLowerCase() === needle ||
+          String(p.barcode || '').toLowerCase() === needle
+        ) || products[0];
+        if (prod) {
+          line.product_id = prod.id;
+          line.product_name = prod.name;
+          if (!line.unit_price) line.unit_price = prod.price_cost || 0;
+        }
       } catch (_) {}
+    },
+
+    orderPayload() {
+      return {
+        customer_name: this.form.customer_name,
+        customer_id: this.form.customer_email || null,
+        notes: this.form.notes || null,
+        lines: this.form.lines
+          .filter(line => line.product_id && line.quantity > 0)
+          .map(line => ({
+            product_id: line.product_id,
+            quantity_requested: line.quantity,
+          })),
+      };
     },
 
     async saveOrder() {
       if (this.submitting) return;
       this.submitting = true;
       try {
-        await api('POST', '/orders', this.form);
+        const payload = this.orderPayload();
+        if (!payload.lines.length) {
+          toast('Selecciona al menos un producto existente por NIU o codigo de barras', 'warning');
+          return;
+        }
+        await api('POST', '/orders', payload);
         toast('Orden creada correctamente', 'success');
         this.closeModal(); await this.fetchOrders();
       } catch (_) {} finally { this.submitting = false; }
@@ -263,7 +287,8 @@ function ordersData() {
 
     async startPicking(id) {
       try {
-        await api('POST', `/orders/${id}/start-picking`);
+        const user = getCurrentUser();
+        await api('POST', `/orders/${id}/start-picking`, { picker_id: user?.id });
         toast('Picking iniciado', 'success');
         window.location.href = `/picking?order_id=${id}`;
       } catch (_) {}
@@ -271,17 +296,17 @@ function ordersData() {
 
     async confirmOrder(id) {
       if (!await confirmDialog('¿Confirmar esta orden?')) return;
-      try { await api('POST', `/orders/${id}/confirm`); toast('Orden confirmada', 'success'); await this.fetchOrders(); } catch (_) {}
+      try { await api('POST', `/orders/${id}/confirm`, { conformity_notes: null }); toast('Orden confirmada', 'success'); await this.fetchOrders(); } catch (_) {}
     },
 
     async returnOrder(id) {
       if (!await confirmDialog('¿Registrar devolución para esta orden?', 'Devolución')) return;
-      try { await api('POST', `/orders/${id}/return`); toast('Devolución registrada', 'success'); await this.fetchOrders(); } catch (_) {}
+      try { await api('POST', `/orders/${id}/return`, { return_reason: 'Devolucion registrada desde dashboard' }); toast('Devolución registrada', 'success'); await this.fetchOrders(); } catch (_) {}
     },
 
     async cancelOrder(id) {
       if (!await confirmDialog('¿Cancelar esta orden? Esta acción no se puede deshacer.', 'Cancelar orden')) return;
-      try { await api('POST', `/orders/${id}/cancel`); toast('Orden cancelada', 'success'); await this.fetchOrders(); } catch (_) {}
+      try { await api('PUT', `/orders/${id}/status?status=CANCELLED`); toast('Orden cancelada', 'success'); await this.fetchOrders(); } catch (_) {}
     },
 
     changePage(p) { if (p<1||p>this.totalPages) return; this.currentPage=p; this.fetchOrders(); },

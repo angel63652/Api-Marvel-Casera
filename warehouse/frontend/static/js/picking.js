@@ -95,12 +95,13 @@ class PickingManager {
   async loadOrder(orderId) {
     this.orderId = orderId;
     try {
-      const data = await api('GET', `/orders/${orderId}/picking-list`);
-      this.orderData = data;
-      this.lines = data.lines || [];
+      const lines = await api('GET', `/orders/${orderId}/picking-list`);
+      const order = await api('GET', `/orders/${orderId}`);
+      this.orderData = order;
+      this.lines = (Array.isArray(lines) ? lines : lines.lines || []).map(line => this._normalizeLine(line));
       this.currentLineIndex = this._findFirstPending();
       this.scanner.start();
-      return data;
+      return order;
     } catch (err) {
       toast('Error al cargar la orden de picking', 'error');
       throw err;
@@ -111,7 +112,7 @@ class PickingManager {
   matchBarcode(barcode) {
     const match = this.lines.find(l =>
       (l.product_barcode === barcode || l.product_niu === barcode) &&
-      l.status === 'pending'
+      statusKey(l.status) === 'pending'
     );
 
     if (match) {
@@ -130,7 +131,7 @@ class PickingManager {
 
   /* ---- Pick a line ---- */
   async pickLine(lineId, qty, notes = '') {
-    const payload = { quantity_picked: qty, notes };
+    const payload = { quantity_picked: qty, observation: notes || null };
 
     if (!navigator.onLine) {
       this._queueOffline({ type: 'pick', orderId: this.orderId, lineId, payload });
@@ -140,7 +141,7 @@ class PickingManager {
     }
 
     try {
-      const result = await api('POST', `/orders/${this.orderId}/picking-lines/${lineId}/pick`, payload);
+      const result = await api('POST', `/orders/${this.orderId}/lines/${lineId}/pick`, payload);
       this._markLineLocally(lineId, 'picked', qty);
       this.feedbackSuccess();
       return result;
@@ -152,7 +153,7 @@ class PickingManager {
 
   /* ---- Add observation ---- */
   async addObservation(lineId, type, notes) {
-    const payload = { observation_type: type, notes };
+    const payload = { observation: notes, status: 'MISSING' };
 
     if (!navigator.onLine) {
       this._queueOffline({ type: 'observation', orderId: this.orderId, lineId, payload });
@@ -162,7 +163,7 @@ class PickingManager {
     }
 
     try {
-      const result = await api('POST', `/orders/${this.orderId}/picking-lines/${lineId}/observation`, payload);
+      const result = await api('POST', `/orders/${this.orderId}/lines/${lineId}/observe`, payload);
       this._markLineLocally(lineId, 'observed', 0);
       return result;
     } catch (err) {
@@ -173,12 +174,12 @@ class PickingManager {
 
   /* ---- Navigate to next pending line ---- */
   navigateToNextPending() {
-    const nextIdx = this.lines.findIndex((l, i) => i > this.currentLineIndex && l.status === 'pending');
+    const nextIdx = this.lines.findIndex((l, i) => i > this.currentLineIndex && statusKey(l.status) === 'pending');
     if (nextIdx !== -1) {
       this.currentLineIndex = nextIdx;
     } else {
       // wrap around
-      const fromStart = this.lines.findIndex(l => l.status === 'pending');
+      const fromStart = this.lines.findIndex(l => statusKey(l.status) === 'pending');
       if (fromStart !== -1) {
         this.currentLineIndex = fromStart;
       } else {
@@ -191,11 +192,11 @@ class PickingManager {
 
   /* ---- Check if all lines processed ---- */
   allProcessed() {
-    return this.lines.every(l => l.status !== 'pending');
+    return this.lines.every(l => statusKey(l.status) !== 'pending');
   }
 
   pickedCount() {
-    return this.lines.filter(l => l.status === 'picked').length;
+    return this.lines.filter(l => statusKey(l.status) === 'picked').length;
   }
 
   totalCount() {
@@ -204,7 +205,7 @@ class PickingManager {
 
   progressPct() {
     if (!this.lines.length) return 0;
-    return Math.round((this.lines.filter(l => l.status !== 'pending').length / this.lines.length) * 100);
+    return Math.round((this.lines.filter(l => statusKey(l.status) !== 'pending').length / this.lines.length) * 100);
   }
 
   /* ---- Complete order (show conformity screen) ---- */
@@ -215,7 +216,7 @@ class PickingManager {
   /* ---- Confirm conformity ---- */
   async confirmConformity(notes) {
     try {
-      const result = await api('POST', `/orders/${this.orderId}/confirm-picking`, { notes });
+      const result = await api('POST', `/orders/${this.orderId}/confirm`, { conformity_notes: notes || null });
       this.scanner.stop();
       await this._syncOfflineQueue();
       return result;
@@ -256,9 +257,9 @@ class PickingManager {
     for (const action of pending) {
       try {
         if (action.type === 'pick') {
-          await api('POST', `/orders/${action.orderId}/picking-lines/${action.lineId}/pick`, action.payload);
+          await api('POST', `/orders/${action.orderId}/lines/${action.lineId}/pick`, action.payload);
         } else if (action.type === 'observation') {
-          await api('POST', `/orders/${action.orderId}/picking-lines/${action.lineId}/observation`, action.payload);
+          await api('POST', `/orders/${action.orderId}/lines/${action.lineId}/observe`, action.payload);
         }
         synced++;
       } catch (_) {
@@ -283,8 +284,17 @@ class PickingManager {
   }
 
   _findFirstPending() {
-    const idx = this.lines.findIndex(l => l.status === 'pending');
+    const idx = this.lines.findIndex(l => statusKey(l.status) === 'pending');
     return idx === -1 ? 0 : idx;
+  }
+
+  _normalizeLine(line) {
+    return {
+      ...line,
+      id: line.id ?? line.line_id,
+      quantity_needed: line.quantity_needed ?? line.quantity_requested ?? 0,
+      status: statusKey(line.status || 'PENDING'),
+    };
   }
 
   _renderCurrentLine() {

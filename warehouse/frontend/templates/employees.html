@@ -277,22 +277,71 @@ function employeesData() {
 
     async fetchEmployees() {
       try {
-        const params = new URLSearchParams({ page_size: 100 });
-        if (this.search) params.set('search', this.search);
-        if (this.filterDept) params.set('department', this.filterDept);
-        const data = await api('GET', `/employees?${params}`);
-        this.employees = data.items || data || [];
+        const data = await api('GET', '/employees');
+        const needle = this.search.toLowerCase();
+        this.employees = (data.items || data || [])
+          .map(e => this.normalizeEmployee(e))
+          .filter(e => !needle || [e.full_name, e.email, e.department].some(v => String(v || '').toLowerCase().includes(needle)))
+          .filter(e => !this.filterDept || e.department === this.filterDept);
+        this.fetchDepartments();
       } catch (_) {}
     },
     async fetchDepartments() {
-      try { const data = await api('GET', '/employees/departments'); this.departments = data || []; } catch (_) {}
+      this.departments = [...new Set(this.employees.map(e => e.department).filter(Boolean))].sort();
     },
     async fetchPayrolls() {
       try {
-        const params = new URLSearchParams({ month: this.payrollMonth, year: this.payrollYear });
-        const data = await api('GET', `/payrolls?${params}`);
-        this.payrollRows = data.items || data || [];
+        if (!this.employees.length) await this.fetchEmployees();
+        const data = await api('GET', `/employees/payrolls/report/${this.payrollYear}/${this.payrollMonth}`);
+        const payrolls = data.items || data || [];
+        const byEmployee = new Map(payrolls.map(p => [p.employee_id, p]));
+        this.payrollRows = this.employees.map(emp => {
+          const payroll = byEmployee.get(emp.id);
+          return {
+            employee_id: emp.id,
+            first_name: emp.first_name,
+            last_name: emp.last_name,
+            full_name: emp.full_name,
+            department: emp.department,
+            base_salary: payroll?.salary_base ?? emp.salary,
+            extras: payroll?.bonuses ?? 0,
+            deductions: payroll?.deductions ?? 0,
+            payroll_id: payroll?.id,
+            payroll_status: payroll ? statusKey(payroll.status) === 'paid' ? 'paid' : 'generated' : null,
+          };
+        });
       } catch (_) {}
+    },
+
+    normalizeEmployee(e) {
+      return {
+        ...e,
+        first_name: e.first_name || e.name || '',
+        last_name: e.last_name || e.surname || '',
+        full_name: e.full_name || `${e.name || ''} ${e.surname || ''}`.trim(),
+        salary: e.salary ?? e.salary_base ?? 0,
+        status: e.status || (e.is_active === false ? 'inactive' : 'active'),
+      };
+    },
+    employeePayload() {
+      const payload = {
+        name: this.empForm.first_name,
+        surname: this.empForm.last_name,
+        phone: this.empForm.phone || null,
+        position: this.empForm.position || null,
+        department: this.empForm.department || null,
+        hire_date: this.empForm.hire_date || null,
+        salary_base: this.empForm.salary || 0,
+        is_active: this.empForm.status !== 'inactive',
+      };
+      if (!this.editEmployeeId) {
+        payload.employee_number = `EMP-${Date.now()}`;
+        payload.dni = this.empForm.dni || `DNI-${Date.now()}`;
+        payload.email = this.empForm.email;
+        payload.role = 'PICKER';
+        payload.password = 'admin123';
+      }
+      return payload;
     },
 
     openEmployeeModal() { this.editEmployeeId=null; this.empForm={first_name:'',last_name:'',email:'',phone:'',dni:'',position:'',department:'',salary:0,hire_date:'',status:'active'}; this.showEmployeeModal=true; },
@@ -300,28 +349,29 @@ function employeesData() {
     async saveEmployee() {
       if(this.submitting)return; this.submitting=true;
       try {
-        if(this.editEmployeeId){await api('PUT',`/employees/${this.editEmployeeId}`,this.empForm);toast('Empleado actualizado','success');}
-        else{await api('POST','/employees',this.empForm);toast('Empleado creado','success');}
+        const payload = this.employeePayload();
+        if(this.editEmployeeId){await api('PUT',`/employees/${this.editEmployeeId}`,payload);toast('Empleado actualizado','success');}
+        else{await api('POST','/employees',payload);toast('Empleado creado','success');}
         this.showEmployeeModal=false; await this.fetchEmployees(); await this.fetchDepartments();
       }catch(_){}finally{this.submitting=false;}
     },
     async deleteEmployee(id) {
       if(!await confirmDialog('¿Eliminar este empleado?'))return;
-      try{await api('DELETE',`/employees/${id}`);toast('Empleado eliminado','success');await this.fetchEmployees();}catch(_){}
+      try{await api('PUT',`/employees/${id}`,{is_active:false});toast('Empleado desactivado','success');await this.fetchEmployees();}catch(_){}
     },
     async generatePayroll(row) {
       try{
-        await api('POST','/payrolls',{employee_id:row.employee_id,month:this.payrollMonth,year:this.payrollYear});
+        await api('POST',`/employees/${row.employee_id}/payrolls`,{employee_id:row.employee_id,month:this.payrollMonth,year:this.payrollYear,salary_base:row.base_salary||0,bonuses:row.extras||0,deductions:row.deductions||0});
         toast('Nómina generada','success'); await this.fetchPayrolls();
       }catch(_){}
     },
     async markPaid(row) {
       if(!row.payroll_id)return;
-      try{await api('POST',`/payrolls/${row.payroll_id}/pay`);toast('Nómina marcada como pagada','success');await this.fetchPayrolls();}catch(_){}
+      try{await api('PUT',`/employees/payrolls/${row.payroll_id}/pay`);toast('Nómina marcada como pagada','success');await this.fetchPayrolls();}catch(_){}
     },
     printPayslip(row) {
       if(!row.payroll_id)return;
-      window.open(`/api/v1/payrolls/${row.payroll_id}/print`,'_blank');
+      toast('Impresion de nomina pendiente de endpoint backend', 'info');
     },
 
     statusBadge:(s)=>statusBadge(s),

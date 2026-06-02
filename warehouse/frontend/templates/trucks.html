@@ -115,7 +115,7 @@
               <span x-html="statusBadge(sched.status)"></span>
               <div class="flex gap-1.5">
                 <button @click="editSchedule(sched)" class="px-2 py-1 text-xs font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded transition-colors">Editar</button>
-                <button @click="updateScheduleStatus(sched.id, 'delivered')" x-show="sched.status==='scheduled'" class="px-2 py-1 text-xs font-medium text-green-700 bg-green-50 hover:bg-green-100 rounded transition-colors">Entregado</button>
+                <button @click="updateScheduleStatus(sched.id, 'COMPLETED')" x-show="statusKey(sched.status)==='scheduled'" class="px-2 py-1 text-xs font-medium text-green-700 bg-green-50 hover:bg-green-100 rounded transition-colors">Completado</button>
                 <button @click="deleteSchedule(sched.id)" class="px-2 py-1 text-xs font-medium text-red-700 bg-red-50 hover:bg-red-100 rounded transition-colors">Eliminar</button>
               </div>
             </div>
@@ -299,10 +299,10 @@
           <div>
             <label class="form-label">Estado</label>
             <select class="form-input" x-model="schedForm.status">
-              <option value="scheduled">Programado</option>
-              <option value="in_transit">En Tránsito</option>
-              <option value="delivered">Entregado</option>
-              <option value="cancelled">Cancelado</option>
+              <option value="SCHEDULED">Programado</option>
+              <option value="IN_ROUTE">En ruta</option>
+              <option value="COMPLETED">Completado</option>
+              <option value="CANCELLED">Cancelado</option>
             </select>
           </div>
         </div>
@@ -334,7 +334,7 @@ function trucksData() {
     showTruckModal: false, showScheduleModal: false,
     editTruckId: null, editScheduleId: null,
     truckForm: { plate: '', brand: '', model: '', year: '', capacity_kg: '', status: 'active', driver_id: '' },
-    schedForm: { truck_id: '', driver_id: '', scheduled_date: '', departure_time: '', route: '', estimated_cost: '', status: 'scheduled', notes: '' },
+    schedForm: { truck_id: '', driver_id: '', scheduled_date: '', departure_time: '', route: '', estimated_cost: '', status: 'SCHEDULED', notes: '' },
     scheduleDate: new Date().toISOString().slice(0,10),
     historyFrom: '', historyTo: '',
     historyStats: { total_trips: 0, total_cost: 0, avg_cost: 0 },
@@ -358,20 +358,21 @@ function trucksData() {
     },
 
     async fetchTrucks() {
-      try { const data = await api('GET', '/trucks'); this.trucks = data.items || data || []; } catch (_) {}
+      try { const data = await api('GET', '/trucks'); this.trucks = (data.items || data || []).map(t => this.normalizeTruck(t)); } catch (_) {}
     },
     async fetchSchedules() {
       try {
-        const params = new URLSearchParams({ date: this.scheduleDate, view: this.scheduleView });
-        const data = await api('GET', `/truck-schedules?${params}`);
-        this.schedules = data.items || data || [];
+        const data = await api('GET', '/trucks/schedules');
+        this.schedules = (data.items || data || []).map(s => this.normalizeSchedule(s));
       } catch (_) {}
     },
     async fetchHistory() {
       try {
-        const params = new URLSearchParams({ date_from: this.historyFrom, date_to: this.historyTo });
-        const data = await api('GET', `/truck-schedules/history?${params}`);
-        this.history = data.items || data || [];
+        const params = new URLSearchParams();
+        if (this.historyFrom) params.set('start_date', `${this.historyFrom}T00:00:00`);
+        if (this.historyTo) params.set('end_date', `${this.historyTo}T23:59:59`);
+        const data = await api('GET', `/trucks/schedules/history?${params}`);
+        this.history = (data.schedules || data.items || data || []).map(s => this.normalizeSchedule(s));
         this.historyStats = data.stats || { total_trips: this.history.length, total_cost: this.history.reduce((s,h)=>s+(h.actual_cost||h.estimated_cost||0),0), avg_cost: 0 };
         if (this.history.length) this.historyStats.avg_cost = this.historyStats.total_cost / this.history.length;
       } catch (_) {}
@@ -380,43 +381,78 @@ function trucksData() {
       try { const data = await api('GET', '/employees?page_size=100'); this.employees = data.items || data || []; } catch (_) {}
     },
 
+    normalizeTruck(t) {
+      return { ...t, model: t.model_name || t.model || '', status: t.is_active === false ? 'inactive' : 'active' };
+    },
+    normalizeSchedule(s) {
+      return { ...s, scheduled_date: (s.date || '').slice(0, 10), route: s.route_description || s.route || '', status: statusKey(s.status) };
+    },
+    truckPayload() {
+      return {
+        plate: this.truckForm.plate,
+        brand: this.truckForm.brand || '',
+        model_name: this.truckForm.model || '',
+        capacity_kg: this.truckForm.capacity_kg || null,
+        driver_id: this.truckForm.driver_id || null,
+        is_active: this.truckForm.status !== 'inactive',
+      };
+    },
+    schedulePayload() {
+      const date = this.schedForm.scheduled_date || new Date().toISOString().slice(0, 10);
+      return {
+        truck_id: Number(this.schedForm.truck_id),
+        driver_id: this.schedForm.driver_id ? Number(this.schedForm.driver_id) : null,
+        date: `${date}T00:00:00`,
+        departure_time: this.schedForm.departure_time ? `${date}T${this.schedForm.departure_time}:00` : null,
+        route_description: this.schedForm.route || null,
+        estimated_cost: this.schedForm.estimated_cost || null,
+        status: this.schedForm.status,
+        notes: this.schedForm.notes || null,
+      };
+    },
+
     openTruckModal() { this.editTruckId=null; this.truckForm={plate:'',brand:'',model:'',year:'',capacity_kg:'',status:'active',driver_id:''}; this.showTruckModal=true; },
     editTruck(t) { this.editTruckId=t.id; this.truckForm={plate:t.plate,brand:t.brand||'',model:t.model||'',year:t.year||'',capacity_kg:t.capacity_kg||'',status:t.status,driver_id:t.driver_id||''}; this.showTruckModal=true; },
     async saveTruck() {
       if(this.submitting)return; this.submitting=true;
       try {
-        if(this.editTruckId){await api('PUT',`/trucks/${this.editTruckId}`,this.truckForm);toast('Camión actualizado','success');}
-        else{await api('POST','/trucks',this.truckForm);toast('Camión añadido','success');}
+        const payload = this.truckPayload();
+        if(this.editTruckId){await api('PUT',`/trucks/${this.editTruckId}`,payload);toast('Camión actualizado','success');}
+        else{await api('POST','/trucks',payload);toast('Camión añadido','success');}
         this.showTruckModal=false; await this.fetchTrucks();
       }catch(_){}finally{this.submitting=false;}
     },
     async deleteTruck(id){
       if(!await confirmDialog('¿Eliminar este camión?'))return;
-      try{await api('DELETE',`/trucks/${id}`);toast('Camión eliminado','success');await this.fetchTrucks();}catch(_){}
+      try{await api('PUT',`/trucks/${id}`,{is_active:false});toast('Camión desactivado','success');await this.fetchTrucks();}catch(_){}
     },
 
-    openScheduleModal(){ this.editScheduleId=null; const today=new Date().toISOString().slice(0,10); this.schedForm={truck_id:'',driver_id:'',scheduled_date:today,departure_time:'08:00',route:'',estimated_cost:'',status:'scheduled',notes:''}; this.showScheduleModal=true; },
-    editSchedule(s){ this.editScheduleId=s.id; this.schedForm={truck_id:s.truck_id||'',driver_id:s.driver_id||'',scheduled_date:s.scheduled_date,departure_time:s.departure_time||'',route:s.route||'',estimated_cost:s.estimated_cost||'',status:s.status,notes:s.notes||''}; this.showScheduleModal=true; },
+    openScheduleModal(){ this.editScheduleId=null; const today=new Date().toISOString().slice(0,10); this.schedForm={truck_id:'',driver_id:'',scheduled_date:today,departure_time:'08:00',route:'',estimated_cost:'',status:'SCHEDULED',notes:''}; this.showScheduleModal=true; },
+    editSchedule(s){ const st={scheduled:'SCHEDULED',in_route:'IN_ROUTE',completed:'COMPLETED',cancelled:'CANCELLED'}[statusKey(s.status)] || 'SCHEDULED'; this.editScheduleId=s.id; this.schedForm={truck_id:s.truck_id||'',driver_id:s.driver_id||'',scheduled_date:s.scheduled_date,departure_time:(s.departure_time||'').slice(11,16),route:s.route||'',estimated_cost:s.estimated_cost||'',status:st,notes:s.notes||''}; this.showScheduleModal=true; },
     async saveSchedule(){
       if(this.submitting)return; this.submitting=true;
       try{
-        if(this.editScheduleId){await api('PUT',`/truck-schedules/${this.editScheduleId}`,this.schedForm);toast('Programación actualizada','success');}
-        else{await api('POST','/truck-schedules',this.schedForm);toast('Programación creada','success');}
+        const payload = this.schedulePayload();
+        if(this.editScheduleId){await api('PUT',`/trucks/schedules/${this.editScheduleId}`,payload);toast('Programación actualizada','success');}
+        else{await api('POST','/trucks/schedules',payload);toast('Programación creada','success');}
         this.showScheduleModal=false;await this.fetchSchedules();
       }catch(_){}finally{this.submitting=false;}
     },
     async updateScheduleStatus(id,status){
-      try{await api('PATCH',`/truck-schedules/${id}`,{status});toast('Estado actualizado','success');await this.fetchSchedules();}catch(_){}
+      try{
+        if(status === 'COMPLETED') await api('POST',`/trucks/schedules/${id}/complete`,{});
+        else await api('PUT',`/trucks/schedules/${id}`,{status});
+        toast('Estado actualizado','success');await this.fetchSchedules();
+      }catch(_){}
     },
     async deleteSchedule(id){
       if(!await confirmDialog('¿Eliminar esta programación?'))return;
-      try{await api('DELETE',`/truck-schedules/${id}`);toast('Programación eliminada','success');await this.fetchSchedules();}catch(_){}
+      try{await api('PUT',`/trucks/schedules/${id}`,{status:'CANCELLED'});toast('Programación cancelada','success');await this.fetchSchedules();}catch(_){}
     },
 
     async exportExcel(){
       try{
-        const params=new URLSearchParams({date_from:this.historyFrom,date_to:this.historyTo,format:'excel'});
-        window.open(`/api/v1/truck-schedules/history/export?${params}`,'_blank');
+        toast('Exportacion de historial pendiente de endpoint backend', 'info');
       }catch(_){}
     },
 

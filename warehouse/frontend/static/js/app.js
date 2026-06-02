@@ -338,7 +338,12 @@ function escapeHtml(str) {
     .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
+function statusKey(status) {
+  return String(status || '').toLowerCase();
+}
+
 function statusBadge(status) {
+  const key = statusKey(status);
   const map = {
     pending: ['badge-pending', 'Pendiente'],
     picking: ['badge-picking', 'Picking'],
@@ -350,19 +355,23 @@ function statusBadge(status) {
     ok: ['badge-ok', 'OK'],
     low: ['badge-low', 'Bajo'],
     out: ['badge-out', 'Sin Stock'],
-    HIGH: ['badge-high', 'Alta'],
-    MEDIUM: ['badge-medium', 'Media'],
-    LOW: ['badge-low-p', 'Baja'],
+    high: ['badge-high', 'Alta'],
+    medium: ['badge-medium', 'Media'],
+    low_priority: ['badge-low-p', 'Baja'],
     active: ['badge-active', 'Activo'],
     inactive: ['badge-inactive', 'Inactivo'],
     maintenance: ['badge-maintenance', 'Mantenimiento'],
     scheduled: ['badge-picking', 'Programado'],
+    in_route: ['badge-returned', 'En ruta'],
     in_transit: ['badge-returned', 'En Tránsito'],
     delivered: ['badge-completed', 'Entregado'],
     paid: ['badge-completed', 'Pagado'],
     generated: ['badge-picking', 'Generado'],
+    partial: ['badge-returned', 'Parcial'],
+    picked: ['badge-completed', 'Picado'],
+    missing: ['badge-cancelled', 'Incidencia'],
   };
-  const [cls, label] = map[status] || ['badge-draft', status || '?'];
+  const [cls, label] = map[key] || ['badge-draft', status || '?'];
   return `<span class="badge ${cls}">${label}</span>`;
 }
 

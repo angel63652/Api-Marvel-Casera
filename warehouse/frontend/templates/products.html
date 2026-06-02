@@ -66,10 +66,10 @@
               <td class="px-4 py-3 text-gray-600 hidden md:table-cell" data-label="Categoría" x-text="p.category || '—'"></td>
               <td class="px-4 py-3 text-gray-600 hidden lg:table-cell" data-label="Unidad" x-text="p.unit || '—'"></td>
               <td class="px-4 py-3 text-right font-semibold" data-label="Stock"
-                  :class="p.current_stock <= 0 ? 'text-red-600' : p.current_stock <= p.minimum_stock ? 'text-amber-600' : 'text-gray-800'"
+                  :class="p.current_stock <= 0 ? 'text-red-600' : p.current_stock <= p.min_stock ? 'text-amber-600' : 'text-gray-800'"
                   x-text="p.current_stock"></td>
-              <td class="px-4 py-3 text-right text-gray-500 hidden sm:table-cell" data-label="Mínimo" x-text="p.minimum_stock"></td>
-              <td class="px-4 py-3 text-center" data-label="Estado" x-html="stockStatusBadge(p.current_stock, p.minimum_stock)"></td>
+              <td class="px-4 py-3 text-right text-gray-500 hidden sm:table-cell" data-label="Mínimo" x-text="p.min_stock"></td>
+              <td class="px-4 py-3 text-center" data-label="Estado" x-html="stockStatusBadge(p.current_stock, p.min_stock)"></td>
               <td class="px-4 py-3" data-label="Acciones">
                 <div class="flex items-center justify-center gap-2">
                   <button @click="editProduct(p)" class="p-1.5 text-blue-600 hover:bg-blue-50 rounded transition-colors" title="Editar">
@@ -185,7 +185,8 @@ function productsData() {
     errors: {},
 
     async init() {
-      await Promise.all([this.fetchProducts(), this.fetchCategories()]);
+      await this.fetchProducts();
+      this.fetchCategories();
     },
 
     async fetchProducts() {
@@ -195,16 +196,30 @@ function productsData() {
         if (this.search) params.set('search', this.search);
         if (this.filterCategory) params.set('category', this.filterCategory);
         const data = await api('GET', `/products?${params}`);
-        this.products = data.items || data || [];
+        this.products = (data.items || data || []).map(p => this.normalizeProduct(p));
         this.totalPages = data.total_pages || 1;
       } catch (_) {} finally { this.loading = false; }
     },
 
-    async fetchCategories() {
-      try {
-        const data = await api('GET', '/products/categories');
-        this.categories = data || [];
-      } catch (_) {}
+    fetchCategories() {
+      this.categories = [...new Set(this.products.map(p => p.category).filter(Boolean))].sort();
+    },
+
+    normalizeProduct(p) {
+      return { ...p, min_stock: p.min_stock ?? p.minimum_stock ?? 0 };
+    },
+
+    productPayload() {
+      const payload = {
+        barcode: this.form.barcode || this.form.niu,
+        name: this.form.name,
+        description: this.form.description || null,
+        category: this.form.category || null,
+        unit: this.form.unit || 'unit',
+        min_stock: this.form.minimum_stock || 0,
+      };
+      if (!this.editId) payload.niu = this.form.niu;
+      return payload;
     },
 
     openModal() {
@@ -216,7 +231,7 @@ function productsData() {
 
     editProduct(p) {
       this.editId = p.id;
-      this.form = { niu: p.niu, barcode: p.barcode || '', name: p.name, category: p.category || '', unit: p.unit || '', current_stock: p.current_stock, minimum_stock: p.minimum_stock, description: p.description || '' };
+      this.form = { niu: p.niu, barcode: p.barcode || '', name: p.name, category: p.category || '', unit: p.unit || '', current_stock: p.current_stock, minimum_stock: p.min_stock, description: p.description || '' };
       this.errors = {};
       this.showModal = true;
     },
@@ -234,11 +249,12 @@ function productsData() {
       if (!this.validate() || this.submitting) return;
       this.submitting = true;
       try {
+        const payload = this.productPayload();
         if (this.editId) {
-          await api('PUT', `/products/${this.editId}`, this.form);
+          await api('PUT', `/products/${this.editId}`, payload);
           toast('Producto actualizado', 'success');
         } else {
-          await api('POST', '/products', this.form);
+          await api('POST', '/products', payload);
           toast('Producto creado', 'success');
         }
         this.closeModal();
