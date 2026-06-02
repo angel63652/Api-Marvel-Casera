@@ -43,7 +43,7 @@ Ver detalle en `AUDITORIA.md` Â§2-Â§3 y Â§8.
 | C4 | OAuth Gmail real | backend | â€” | LIBRE | `email_service.sync_gmail` listo |
 | C5 | EnvÃ­o real de notificaciones a oficina (SMTP/Gmail) | backend | â€” | LIBRE | `email_service.notify_office` |
 | C6 | Export Excel (camiones, nÃ³minas) | full | â€” | LIBRE | `openpyxl` ya estÃ¡ |
-| C7 | AprobaciÃ³n con contraseÃ±a en ajustes de stock | backend | â€” | LIBRE | `verify_password` existe |
+| C7 | AprobaciÃ³n con contraseÃ±a en ajustes de stock | backend | **Claude** | EN CURSO (2026-06-02) | endpoint `POST /movements/adjustment` (MANAGER, re-verifica password); el genÃ©rico rechaza ADJUSTMENT |
 | C10 | Etiquetas de barcode (Pillow) | backend | â€” | LIBRE | |
 | C12 | PaginaciÃ³n frontend (consume R5) | frontend | **Codex** | HECHO (2026-06-02) | productos/ordenes/movimientos/ubicaciones consumen `limit`/`offset` + `X-Total-Count` |
 | C13 | UI analitica y carga de tarifas (consume P6) | frontend | **Codex** | HECHO (2026-06-03) | `dashboard.html`; consume `/analytics/sales-summary` y `/analytics/import-tier-prices` |
