@@ -1,4 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import StreamingResponse
+import io
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Optional
@@ -6,6 +8,7 @@ from datetime import datetime, timezone
 from collections import defaultdict
 
 from app.database import get_db
+from app.services import excel_service
 from app.models.truck import (
     Truck,
     TruckSchedule,
@@ -181,6 +184,42 @@ async def schedules_history(
         },
         "schedules": [_sched_resp(s) for s in schedules],
     }
+
+
+@router.get("/schedules/history/export")
+async def schedules_history_export(
+    start_date: Optional[datetime] = None,
+    end_date: Optional[datetime] = None,
+    db: AsyncSession = Depends(get_db),
+    _: Employee = Depends(require_role("MANAGER", "OFFICE")),
+):
+    """Download the completed-trips history as an Excel file."""
+    stmt = select(TruckSchedule).where(TruckSchedule.status == ScheduleStatus.COMPLETED)
+    if start_date:
+        stmt = stmt.where(TruckSchedule.date >= start_date)
+    if end_date:
+        stmt = stmt.where(TruckSchedule.date <= end_date)
+    stmt = stmt.order_by(TruckSchedule.date.desc())
+    schedules = (await db.execute(stmt)).scalars().all()
+
+    headers = [
+        "Fecha", "Matrícula", "Conductor", "Tipo", "Ruta",
+        "Coste estimado", "Coste real", "Desviación", "Estado",
+    ]
+    rows = []
+    for s in schedules:
+        est = s.estimated_cost or 0.0
+        act = s.actual_cost or 0.0
+        rows.append([
+            s.date, s.truck.plate if s.truck else None,
+            (f"{s.driver.name} {s.driver.surname}" if s.driver else None),
+            s.schedule_type, s.route_description, est, act, round(act - est, 2), s.status,
+        ])
+    data = excel_service.build_xlsx("Histórico camiones", headers, rows)
+    return StreamingResponse(
+        io.BytesIO(data), media_type=excel_service.XLSX_MEDIA,
+        headers=excel_service.xlsx_headers("historico_camiones.xlsx"),
+    )
 
 
 @router.get("/schedules/{schedule_id}", response_model=TruckScheduleResponse)

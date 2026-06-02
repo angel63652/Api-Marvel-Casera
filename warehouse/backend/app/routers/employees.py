@@ -1,4 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import StreamingResponse
+import io
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Optional
@@ -241,6 +243,39 @@ async def payroll_report(
     stmt = select(Payroll).where(Payroll.year == year, Payroll.month == month)
     result = await db.execute(stmt)
     return [_payroll_resp(p) for p in result.scalars().all()]
+
+
+@router.get("/payrolls/report/{year}/{month}/export")
+async def payroll_report_export(
+    year: int,
+    month: int,
+    db: AsyncSession = Depends(get_db),
+    _: Employee = Depends(require_role("MANAGER")),
+):
+    """Download the month's payroll report as an Excel file."""
+    from app.services import excel_service
+
+    stmt = select(Payroll).where(Payroll.year == year, Payroll.month == month)
+    payrolls = (await db.execute(stmt)).scalars().all()
+
+    headers = [
+        "Empleado", "Año", "Mes", "Salario base", "Bonus",
+        "Deducciones", "Neto", "Estado",
+    ]
+    rows = [
+        [
+            (f"{p.employee.name} {p.employee.surname}" if p.employee else p.employee_id),
+            p.year,
+            MONTH_NAMES[p.month] if 1 <= p.month <= 12 else p.month,
+            p.salary_base, p.bonuses, p.deductions, p.net_salary, p.status,
+        ]
+        for p in payrolls
+    ]
+    data = excel_service.build_xlsx(f"Nóminas {month}-{year}", headers, rows)
+    return StreamingResponse(
+        io.BytesIO(data), media_type=excel_service.XLSX_MEDIA,
+        headers=excel_service.xlsx_headers(f"nominas_{year}_{month:02d}.xlsx"),
+    )
 
 
 @router.put("/payrolls/{payroll_id}/pay", response_model=PayrollResponse)

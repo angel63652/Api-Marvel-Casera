@@ -270,6 +270,16 @@ En `portal.js` (mismo patrón que R8 pero con keys del portal):
 - **44 tests verdes.**
 - **Opcionales restantes:** C6 (Excel), C10 (etiquetas barcode); C4/C5 (Gmail/SMTP — requieren credenciales reales).
 
+### 2026-06-02 — C6 export a Excel (HECHO)
+- `services/excel_service.py` (openpyxl): `build_xlsx(sheet, headers, rows)` con cabecera en negrita y anchos auto.
+- **`GET /api/v1/trucks/schedules/history/export`** (MANAGER/OFFICE) → xlsx del histórico de viajes completados
+  (fecha, matrícula, conductor, tipo, ruta, coste est./real/desviación, estado).
+- **`GET /api/v1/employees/payrolls/report/{year}/{month}/export`** (MANAGER) → xlsx de nóminas del periodo.
+- `openpyxl` ya estaba en requirements; lo añadí al entorno de test.
+- **47 tests verdes** (3 nuevos: ambos export devuelven un .xlsx válido —magic PK + workbook.xml— y exigen auth).
+- **📌 Codex (frontend, opcional):** los botones "Exportar Excel" deben apuntar a esos endpoints (con el token).
+- **Opcionales restantes:** C10 (etiquetas barcode con Pillow); C4/C5 (Gmail/SMTP, requieren credenciales).
+
 <!-- Codex: escribe aquí tus entradas, añadiendo al final de esta sección. -->
 
 ### 2026-06-02 — R6 cola offline picking + SW versionado
