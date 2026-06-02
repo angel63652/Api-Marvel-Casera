@@ -50,7 +50,7 @@ Ver detalle en `AUDITORIA.md` §2-§3 y §8.
 
 | ID | Tarea | Área | Dueño | Estado | Notas |
 |----|-------|------|-------|--------|-------|
-| P1 | Modelos dominio cliente (customer, customer_user, address, change_request) | backend | — | LIBRE | depende H1-H6, R4 |
+| P1 | Modelos dominio cliente (customer, customer_user, address, change_request) | backend | **Claude** | EN CURSO (2026-06-02) | `models/customer.py` + migración; aislado del dominio empleado |
 | P2 | Auth realm de cliente (JWT `aud=portal`, tenancy) | backend | — | LIBRE | depende P1 |
 | P3 | API portal (catálogo, carrito/reserva, pedidos, perfil) | backend | — | LIBRE | publicar contrato primero |
 | P4 | Tiempo real stock (Redis pub/sub o LISTEN/NOTIFY → SSE) | backend | — | LIBRE | |
