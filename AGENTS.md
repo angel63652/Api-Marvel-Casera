@@ -2,15 +2,28 @@
 
 ## ⚠️ LEER ANTES DE HACER CUALQUIER COSA
 
-Este repositorio contiene **DOS proyectos independientes**:
+Este repositorio contiene **UN único proyecto**: **WMS Almacén (Distrigal SL)**, todo en `warehouse/`.
 
-| Directorio | Proyecto | Estado |
-|-----------|---------|--------|
-| `src/marvel_metadata/` | API de metadatos de cómics Marvel | **CONGELADO — no tocar** |
-| `warehouse/` | **WMS Almacén (Distrigal SL)** | **ACTIVO — trabaja aquí** |
+> El antiguo proyecto Marvel (`src/marvel_metadata/`) fue **ELIMINADO**. No lo recrees.
 
-**NO trabajes en `src/marvel_metadata/` ni en ningún otro directorio.**
+**Trabaja solo en `warehouse/`** (+ archivos raíz de coordinación: `AGENTS.md`,
+`ESTADO_PROYECTO.md`, `AUDITORIA.md`, `PROPUESTA_PORTAL_CLIENTE.md`, `coordination/`).
 **NO crees ramas nuevas.** La rama de trabajo es `claude/warehouse-management-system-vmW4R`.
+
+---
+
+## 🤝 COOPERACIÓN ENTRE AGENTES (Claude ↔ Codex) — LEER
+
+Trabajamos **dos agentes en paralelo** sobre la misma rama. Para no pisarnos:
+
+1. **Lee y sigue `coordination/PROTOCOLO.md`** antes de tocar código. Es el flujo obligatorio.
+2. **Haz *claim* en `coordination/TABLERO.md`** antes de empezar una tarea (tu nombre, fecha,
+   `EN CURSO`, archivos). Una sola tarea `EN CURSO` por agente.
+3. **No edites un archivo que el otro tiene en curso.** Reparto por defecto:
+   **backend → Claude**, **frontend → Codex**. `warehouse/backend/app/main.py` es frontera (claim).
+4. **`git pull --rebase` antes de empezar y antes de push.** Commits pequeños.
+5. **Apunta decisiones/avisos en `coordination/BITACORA.md`** (solo en tu sección, al final).
+6. Auditoría y plan del portal cliente: `AUDITORIA.md` y `PROPUESTA_PORTAL_CLIENTE.md` (raíz).
 
 ---
 
@@ -48,55 +61,13 @@ curl http://localhost:8000/health
 
 ---
 
-## 3. Tarea actual → TAREA C1 (ALTA PRIORIDAD)
+## 3. Qué hacer ahora → mira el TABLERO
 
-**Implementar login en el frontend.**
+C1, C2 y C3 ya están **HECHAS**. Las siguientes tareas, con dueño y estado, están en
+**`coordination/TABLERO.md`**. Coge una tarea `LIBRE`, haz *claim* y sigue el `PROTOCOLO.md`.
 
-El backend de autenticación ya funciona (`POST /api/v1/employees/login` devuelve JWT).
-El problema: las páginas HTML no envían el token, por lo que todas las llamadas
-que requieren rol devuelven 401.
+**Prioridad actual:** Sprint 0 de endurecimiento (H1-H7) — son prerrequisito del portal
+cliente. Detalle técnico y ubicaciones en `AUDITORIA.md`.
 
-### Archivos a crear / modificar:
-
-**A) `warehouse/frontend/templates/login.html`** (crear)
-- Página de login: formulario email + password, diseño igual que `base.html` (Tailwind + Alpine.js)
-- Al submit: `POST /api/v1/employees/login` con JSON `{email, password}`
-- Si OK: guardar `token` en `localStorage.setItem('wms_token', token)` y `wms_user` (JSON del empleado)
-- Si error: mostrar mensaje de error
-- No usa `base.html` (no hay sidebar en login)
-
-**B) `warehouse/backend/app/main.py`** (modificar)
-- Añadir ruta `GET /login` → sirve `login.html`
-- La ruta raíz `/` debe redirigir a `/login` si no hay token (esto se gestiona en el JS del cliente)
-
-**C) `warehouse/frontend/static/js/app.js`** (modificar)
-- En la función `api(method, path, body)`: añadir header `Authorization: Bearer <token>` leyendo `localStorage.getItem('wms_token')`
-- Si cualquier respuesta es 401: limpiar localStorage y redirigir a `/login`
-- Añadir función `logout()`: borra `wms_token` y `wms_user` de localStorage, redirige a `/login`
-- Añadir función `getCurrentUser()`: lee y parsea `wms_user` de localStorage
-- Añadir función `requireAuth()`: si no hay token en localStorage, redirigir a `/login`
-
-**D) `warehouse/frontend/templates/base.html`** (modificar)
-- Llamar a `requireAuth()` al inicio del `<script>` del body
-- En el header: mostrar nombre del usuario logueado (`getCurrentUser().full_name`)
-- Añadir botón "Cerrar sesión" que llame a `logout()`
-
-### Verificación de la tarea C1:
-```bash
-# 1. Visitar http://localhost:8000/ → debe redirigir a /login
-# 2. Login con admin@distrigal.com / admin123 → redirige a /
-# 3. Dashboard carga datos reales (no 401)
-# 4. Botón logout → vuelve a /login
-# 5. Sin token: intentar /products directamente → redirige a /login
-```
-
----
-
-## 4. Tareas siguientes (después de C1)
-
-Ver `ESTADO_PROYECTO.md` §8 para la lista completa. Orden:
-
-- **C2** — Cablear páginas SSR con endpoints reales (verificar fetch en products, orders, picking, trucks, employees, emails)
-- **C3** — Migraciones Alembic
-- **C4** — OAuth Gmail real
-- **C7** — Aprobación con contraseña para cambios de stock sensibles
+Reparto por defecto: **backend → Claude**, **frontend → Codex**. Si tu tarea cruza capas,
+publica el contrato de API en `coordination/BITACORA.md` antes de implementar.

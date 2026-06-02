@@ -1,0 +1,68 @@
+# 📋 Tablero de tareas — Claude ↔ Codex
+
+> Sistema de *claim*. Antes de trabajar: pon tu nombre, fecha y `EN CURSO` en tu fila.
+> **Una sola tarea `EN CURSO` por agente.** No edites filas que no son tuyas.
+> Estados: `LIBRE` · `EN CURSO` · `BLOQUEADA` · `HECHO`.
+
+Lee `PROTOCOLO.md` antes de tocar nada. Rama: `claude/warehouse-management-system-vmW4R`.
+
+---
+
+## 🔴 Sprint 0 — Endurecimiento (OBLIGATORIO antes del portal cliente)
+
+Ver detalle en `AUDITORIA.md` §2-§3 y §8.
+
+| ID | Tarea | Área | Dueño | Estado | Archivos / notas |
+|----|-------|------|-------|--------|------------------|
+| H1 | Sacar secretos del código (SECRET_KEY/DATABASE_URL sin default; `DEBUG=False`) | backend/infra | — | LIBRE | `config.py`, `docker-compose.yml`, `.env.example` |
+| H2 | CORS whitelist (quitar `allow_origins=["*"]` + credentials) | backend | — | LIBRE | `main.py` |
+| H3 | Autenticar GET sensibles (dashboard, products, orders, movements, emails) | backend | — | LIBRE | `routers/*.py` |
+| H4 | Admin bootstrap por env + forzar cambio de password | backend | — | LIBRE | `main.py` |
+| H5 | Stock atómico (eliminar race en `apply_movement_delta`) | backend | — | LIBRE | `services/stock_service.py` |
+| H6 | Nº de orden por secuencia (quitar `random.randint`) | backend | — | LIBRE | `services/picking_service.py` |
+| H7 | Limpiar CI roto (`.github/fly-deploy.yml` huérfano) + sacar `__pycache__` del repo | infra | — | LIBRE | `.github/`, `.gitignore` |
+
+## 🟡 Sprint 1 — Robustez
+
+| ID | Tarea | Área | Dueño | Estado | Archivos / notas |
+|----|-------|------|-------|--------|------------------|
+| R1 | Float → Numeric (dinero y cantidades) + migración Alembic | backend | — | LIBRE | modelos, `alembic/versions/` |
+| R2 | Rate limiting en login + revocación/refresh de tokens | backend | — | LIBRE | `auth.py`, `routers/employees.py` |
+| R3 | Tests (`pytest` + `httpx.AsyncClient`): stock, auth, picking (≥60%) | backend | — | LIBRE | `warehouse/backend/tests/` (crear) |
+| R4 | Modelo de **reservas de stock** (`available = físico − reservado`) | backend | — | LIBRE | nuevo `models/`, prerrequisito portal |
+| R5 | Paginación en listados largos | backend | — | LIBRE | `routers/products|orders|movements` |
+| R6 | Cola offline picking a IndexedDB + caché SW versionado | frontend | — | LIBRE | `static/js/picking.js`, `sw.js` |
+
+## 🟢 Roadmap interno pendiente (de ESTADO_PROYECTO.md)
+
+| ID | Tarea | Área | Dueño | Estado | Notas |
+|----|-------|------|-------|--------|-------|
+| C4 | OAuth Gmail real | backend | — | LIBRE | `email_service.sync_gmail` listo |
+| C5 | Envío real de notificaciones a oficina (SMTP/Gmail) | backend | — | LIBRE | `email_service.notify_office` |
+| C6 | Export Excel (camiones, nóminas) | full | — | LIBRE | `openpyxl` ya está |
+| C7 | Aprobación con contraseña en ajustes de stock | backend | — | LIBRE | `verify_password` existe |
+| C10 | Etiquetas de barcode (Pillow) | backend | — | LIBRE | |
+| C12 | Paginación frontend (consume R5) | frontend | — | LIBRE | depende de R5 |
+
+## 🔵 Portal Cliente (ver `PROPUESTA_PORTAL_CLIENTE.md`) — tras Sprint 0/1
+
+| ID | Tarea | Área | Dueño | Estado | Notas |
+|----|-------|------|-------|--------|-------|
+| P1 | Modelos dominio cliente (customer, customer_user, address, change_request) | backend | — | LIBRE | depende H1-H6, R4 |
+| P2 | Auth realm de cliente (JWT `aud=portal`, tenancy) | backend | — | LIBRE | depende P1 |
+| P3 | API portal (catálogo, carrito/reserva, pedidos, perfil) | backend | — | LIBRE | publicar contrato primero |
+| P4 | Tiempo real stock (Redis pub/sub o LISTEN/NOTIFY → SSE) | backend | — | LIBRE | |
+| P5 | PWA portal cliente (separada de la interna) | frontend | — | LIBRE | contra contrato de P3 |
+| P6 | Analítica con Polars (informes, ETL tarifas) | backend | — | LIBRE | fuera del camino del pedido |
+
+---
+
+## ✅ Histórico (HECHO)
+
+| ID | Tarea | Dueño | Fecha |
+|----|-------|-------|-------|
+| C1 | Login frontend JWT | Claude + Codex | 2026-06-02 |
+| C2 | Páginas SSR conectadas a API | Codex | 2026-06-02 |
+| C3 | Migraciones Alembic | Codex | 2026-06-02 |
+| C11 | Iconos PWA 192/512 | — | (existen) |
+| — | Auditoría + propuesta portal cliente | Claude | 2026-06-02 |
