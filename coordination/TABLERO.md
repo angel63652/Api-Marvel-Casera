@@ -26,7 +26,7 @@ Ver detalle en `AUDITORIA.md` §2-§3 y §8.
 
 | ID | Tarea | Área | Dueño | Estado | Archivos / notas |
 |----|-------|------|-------|--------|------------------|
-| R1 | Float → Numeric (dinero y cantidades) + migración Alembic | backend | — | LIBRE | modelos, `alembic/versions/` |
+| R1 | Float → Numeric (dinero) + migración Alembic | backend | **Claude** | EN CURSO (2026-06-02) | `models/{product,movement,employee,truck}.py`, `alembic/versions/` (solo dinero; cantidades siguen Float) |
 | R2 | Rate limiting en login + revocación/refresh de tokens | backend | — | LIBRE | `auth.py`, `routers/employees.py` |
 | R3 | Tests (`pytest` + `httpx.AsyncClient`): stock, auth, picking (≥60%) | backend | — | LIBRE | `warehouse/backend/tests/` (crear) |
 | R4 | Modelo de **reservas de stock** (`available = físico − reservado`) | backend | — | LIBRE | nuevo `models/`, prerrequisito portal |
