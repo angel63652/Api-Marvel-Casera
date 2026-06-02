@@ -66,6 +66,104 @@
     </div>
   </div>
 
+  <!-- Analytics -->
+  <div class="grid grid-cols-1 xl:grid-cols-[1fr_360px] gap-6 mb-6">
+    <div class="card">
+      <div class="flex flex-col lg:flex-row lg:items-end gap-3 mb-4">
+        <div class="flex-1">
+          <h2 class="text-base font-semibold text-gray-900">Analitica de ventas</h2>
+          <p class="text-sm text-gray-500 mt-1">Ventas estimadas por producto desde pedidos completados.</p>
+        </div>
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          <div>
+            <label class="form-label text-xs">Desde</label>
+            <input type="date" class="form-input text-sm" x-model="analyticsFilters.start">
+          </div>
+          <div>
+            <label class="form-label text-xs">Hasta</label>
+            <input type="date" class="form-input text-sm" x-model="analyticsFilters.end">
+          </div>
+          <div>
+            <label class="form-label text-xs">Top</label>
+            <input type="number" class="form-input text-sm" x-model.number="analyticsFilters.top" min="1" max="50">
+          </div>
+          <button type="button" class="mt-5 px-3 py-2 rounded-lg bg-blue-700 text-white text-sm font-semibold hover:bg-blue-800 disabled:opacity-60"
+                  :disabled="analyticsLoading" @click="fetchAnalytics()">
+            Actualizar
+          </button>
+        </div>
+      </div>
+
+      <p x-show="analyticsError" class="mb-3 rounded-lg border border-amber-100 bg-amber-50 px-3 py-2 text-sm text-amber-800"
+         x-text="analyticsError"></p>
+
+      <div class="grid grid-cols-3 gap-3 mb-4">
+        <div class="rounded-lg bg-blue-50 border border-blue-100 p-3">
+          <p class="text-xs text-blue-700 font-semibold uppercase">Unidades</p>
+          <p class="text-xl font-bold text-blue-950 mt-1" x-text="formatNumber(analytics.total_units || 0, 2)"></p>
+        </div>
+        <div class="rounded-lg bg-emerald-50 border border-emerald-100 p-3">
+          <p class="text-xs text-emerald-700 font-semibold uppercase">Importe</p>
+          <p class="text-xl font-bold text-emerald-950 mt-1" x-text="formatCurrency(analytics.total_revenue || 0)"></p>
+        </div>
+        <div class="rounded-lg bg-slate-50 border border-slate-100 p-3">
+          <p class="text-xs text-slate-600 font-semibold uppercase">Lineas</p>
+          <p class="text-xl font-bold text-slate-900 mt-1" x-text="analytics.lines || 0"></p>
+        </div>
+      </div>
+
+      <template x-if="analyticsLoading">
+        <div class="space-y-2">
+          <template x-for="i in 4"><div class="skeleton h-9 w-full rounded"></div></template>
+        </div>
+      </template>
+      <div x-show="!analyticsLoading" class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="border-b border-gray-100">
+              <th class="text-left py-2 font-semibold text-gray-500 text-xs uppercase tracking-wide">Producto</th>
+              <th class="text-right py-2 font-semibold text-gray-500 text-xs uppercase tracking-wide">Unidades</th>
+              <th class="text-right py-2 font-semibold text-gray-500 text-xs uppercase tracking-wide">Importe</th>
+            </tr>
+          </thead>
+          <tbody>
+            <template x-if="!analytics.top_products.length">
+              <tr><td colspan="3" class="py-8 text-center text-gray-400 text-sm">Sin ventas completadas en el rango</td></tr>
+            </template>
+            <template x-for="row in analytics.top_products" :key="row.product_id">
+              <tr class="border-b border-gray-50 hover:bg-gray-50">
+                <td class="py-2.5 font-medium text-gray-800" x-text="row.name"></td>
+                <td class="py-2.5 text-right font-semibold text-gray-700" x-text="formatNumber(row.units, 2)"></td>
+                <td class="py-2.5 text-right font-semibold text-emerald-700" x-text="formatCurrency(row.revenue)"></td>
+              </tr>
+            </template>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2 class="text-base font-semibold text-gray-900">Importar tarifas</h2>
+      <p class="text-sm text-gray-500 mt-1">CSV con columnas <span class="font-mono">niu,tier,price</span>.</p>
+      <form class="mt-4 space-y-3" @submit.prevent="importTierPrices()">
+        <input type="file" x-ref="tierPriceCsv" accept=".csv,text/csv" class="form-input text-sm">
+        <button type="submit" class="w-full px-3 py-2.5 rounded-lg bg-emerald-700 text-white text-sm font-semibold hover:bg-emerald-800 disabled:opacity-60"
+                :disabled="tierImportLoading">
+          <span x-show="!tierImportLoading">Subir CSV</span>
+          <span x-show="tierImportLoading">Importando...</span>
+        </button>
+      </form>
+      <div x-show="tierImportResult" class="mt-4 rounded-lg border border-emerald-100 bg-emerald-50 p-3 text-sm text-emerald-800">
+        <p class="font-semibold">Resultado</p>
+        <p class="mt-1">
+          Creadas <span x-text="tierImportResult?.created || 0"></span>,
+          actualizadas <span x-text="tierImportResult?.updated || 0"></span>,
+          omitidas <span x-text="tierImportResult?.skipped || 0"></span>.
+        </p>
+      </div>
+    </div>
+  </div>
+
   <!-- Main Grid -->
   <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
@@ -241,6 +339,21 @@ function dashboardData() {
     lowStockItems: [],
     todayTrucks: [],
     recentMovements: [],
+    analyticsLoading: true,
+    analyticsError: '',
+    analytics: {
+      total_units: 0,
+      total_revenue: 0,
+      lines: 0,
+      top_products: [],
+    },
+    analyticsFilters: {
+      start: '',
+      end: '',
+      top: 10,
+    },
+    tierImportLoading: false,
+    tierImportResult: null,
 
     async init() {
       try {
@@ -255,10 +368,108 @@ function dashboardData() {
       } finally {
         this.loading = false;
       }
+      await this.fetchAnalytics();
+    },
+
+    analyticsQueryString() {
+      const top = Number(this.analyticsFilters.top || 10);
+      const boundedTop = Math.min(Math.max(Number.isFinite(top) ? top : 10, 1), 50);
+      const params = new URLSearchParams({ top: String(boundedTop) });
+
+      if (this.analyticsFilters.start) {
+        params.set('start_date', `${this.analyticsFilters.start}T00:00:00`);
+      }
+      if (this.analyticsFilters.end) {
+        params.set('end_date', `${this.analyticsFilters.end}T23:59:59`);
+      }
+
+      return params.toString();
+    },
+
+    async fetchAnalytics() {
+      this.analyticsLoading = true;
+      this.analyticsError = '';
+
+      try {
+        const data = await api('GET', `/analytics/sales-summary?${this.analyticsQueryString()}`);
+        this.analytics = {
+          total_units: Number(data?.total_units || 0),
+          total_revenue: Number(data?.total_revenue || 0),
+          lines: Number(data?.lines || 0),
+          top_products: Array.isArray(data?.top_products) ? data.top_products : [],
+        };
+      } catch (err) {
+        this.analyticsError = err?.message || 'No se pudo cargar la analitica';
+      } finally {
+        this.analyticsLoading = false;
+      }
+    },
+
+    async importTierPrices() {
+      const input = this.$refs.tierPriceCsv;
+      const file = input?.files?.[0];
+      if (!file) {
+        toast('Selecciona un CSV de tarifas', 'warning');
+        return;
+      }
+
+      const upload = async () => {
+        const token = localStorage.getItem('wms_token');
+        const headers = {};
+        if (token) headers.Authorization = `Bearer ${token}`;
+
+        const formData = new FormData();
+        formData.append('file', file);
+
+        return fetch('/api/v1/analytics/import-tier-prices', {
+          method: 'POST',
+          headers,
+          credentials: 'same-origin',
+          body: formData,
+        });
+      };
+
+      this.tierImportLoading = true;
+      this.tierImportResult = null;
+
+      try {
+        let res = await upload();
+        if (res.status === 401 && await refreshAccessToken()) {
+          res = await upload();
+        }
+
+        const data = await res.json().catch(() => ({}));
+
+        if (res.status === 401) {
+          clearSession();
+          window.location.replace('/login');
+          return;
+        }
+
+        if (!res.ok) {
+          const message = data.detail || data.message || data.error || `Error ${res.status}: ${res.statusText}`;
+          throw new Error(Array.isArray(message) ? message.map(e => e.msg || e.message || JSON.stringify(e)).join(', ') : message);
+        }
+
+        this.tierImportResult = {
+          created: Number(data.created || 0),
+          updated: Number(data.updated || 0),
+          skipped: Number(data.skipped || 0),
+        };
+        input.value = '';
+        toast('Tarifas importadas', 'success');
+        await this.fetchAnalytics();
+      } catch (err) {
+        toast(err?.message || 'No se pudo importar tarifas', 'error');
+      } finally {
+        this.tierImportLoading = false;
+      }
     },
 
     formatDate: (iso) => formatDate(iso),
     formatDateTime: (iso) => formatDateTime(iso),
+    formatCurrency: (amount) => formatCurrency(amount),
+    formatNumber: (n, decimals = 0) => formatNumber(n, decimals),
     statusBadge: (s) => statusBadge(s),
   };
 }

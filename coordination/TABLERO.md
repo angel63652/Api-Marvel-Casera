@@ -46,7 +46,7 @@ Ver detalle en `AUDITORIA.md` Â§2-Â§3 y Â§8.
 | C7 | AprobaciÃ³n con contraseÃ±a en ajustes de stock | backend | â€” | LIBRE | `verify_password` existe |
 | C10 | Etiquetas de barcode (Pillow) | backend | â€” | LIBRE | |
 | C12 | PaginaciÃ³n frontend (consume R5) | frontend | **Codex** | HECHO (2026-06-02) | productos/ordenes/movimientos/ubicaciones consumen `limit`/`offset` + `X-Total-Count` |
-| C13 | UI analitica y carga de tarifas (consume P6) | frontend | **Codex** | EN CURSO (2026-06-03) | `dashboard.html`; consume `/analytics/sales-summary` y `/analytics/import-tier-prices` |
+| C13 | UI analitica y carga de tarifas (consume P6) | frontend | **Codex** | HECHO (2026-06-03) | `dashboard.html`; consume `/analytics/sales-summary` y `/analytics/import-tier-prices` |
 
 ## ðŸ”µ Portal Cliente (ver `PROPUESTA_PORTAL_CLIENTE.md`) â€” tras Sprint 0/1
 

@@ -297,3 +297,11 @@ En `portal.js` (mismo patrón que R8 pero con keys del portal):
 - Verificacion: sintaxis JS OK, manifest JSON OK, smoke HTTP en SQLite limpia (`/portal`, SW, manifest, register, me, catalog, 403 en pedido PENDING), navegador integrado renderiza acceso/registro, `pytest tests/test_portal_orders.py -q` verde y `pytest tests/test_events.py -q` verde.
 - Limitacion: la suite completa `pytest -q` supero 120s en local; se paro el uvicorn residual de pruebas antes de cerrar.
 - [BACKEND] Ejecutar juntos `pytest tests/test_portal_orders.py tests/test_events.py -q` reproduce timeout en `test_stream_emits_stock_event_on_movement` al crear producto, aunque ambas suites pasan por separado. Parece fixture/servidor de test tras P3+P4, no bloqueo de P5.
+
+### 2026-06-03 — C13 UI analitica y carga de tarifas
+- Claim respetado: solo `dashboard.html` y cierre en tablero/bitacora.
+- Dashboard interno muestra tarjeta de analitica con filtros `start_date`, `end_date`, `top`, KPIs y tabla de `top_products`.
+- Se añade carga CSV de tarifas (`niu,tier,price`) con multipart, bearer JWT, reintento tras refresh 401 y resultado `created/updated/skipped`.
+- Verificacion: `git diff --check`, parseo del script inline con Node empaquetado, `pytest tests/test_analytics.py -q --tb=short` verde, smoke HTTP en SQLite limpia (`/`, `GET /analytics/sales-summary`, `POST /analytics/import-tier-prices`) verde.
+- Limitacion: el navegador embebido abrio `/login`, pero no completo login por fallo del runtime de interaccion (`fill`/click con clipboard/CDP). La comprobacion autenticada se cubrio con smoke HTTP.
+- [BACKEND] En la `wms.db` local existente, `GET /api/v1/analytics/sales-summary` devuelve 500: `sqlite3.OperationalError: no such column: products.price_base`; `POST /api/v1/analytics/import-tier-prices` devuelve 500 por `products.reserved_stock`. La BD local necesita migraciones/recreacion antes de smoke visual autenticado.
