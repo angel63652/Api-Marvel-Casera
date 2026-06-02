@@ -247,3 +247,13 @@ Todos los endpoints devuelven JSON; el token va en `Authorization: Bearer <token
 - Verificacion: `git diff --check`, parseo de scripts inline con Node empaquetado y mock JS de normalizacion/lookup/bloqueo por stock.
 - Limitacion: smoke visual autenticado no completado porque la BD SQLite local no tiene la columna nueva de R4.
 - [BACKEND] En entorno local `sqlite+aiosqlite:///./wms.db`, `GET /api/v1/products?limit=5&offset=0` devuelve 500: `sqlite3.OperationalError: no such column: products.reserved_stock`. Falta aplicar migracion `c3d4reserv01` o recrear la BD local antes del smoke visual.
+
+### 2026-06-02 — P5 PWA portal cliente
+- Claim respetado: frontend separado (`portal.html`, `portal.js`, `portal-manifest.json`, `portal-sw.js`) y `main.py` solo para servir `/portal` + `/portal-sw.js`.
+- Portal con realm aislado: claves `portal_token`, `portal_user`, `portal_customer`, `portal_cart`; no reutiliza `wms_token`.
+- Pantallas incluidas: login/registro, catalogo con `available_stock` y precio de tarifa, carrito persistido, envio de pedidos, historico de pedidos, perfil, direcciones y solicitudes de cambio.
+- Integra P4: fetch-stream a `GET /api/portal/catalog/stream` con bearer token; actualiza `available_stock` en catalogo/carrito y ajusta cantidades si baja el disponible.
+- Service worker propio en `/portal-sw.js` con cache de shell/estaticos; no cachea respuestas autenticadas de `/api/portal/*`.
+- Verificacion: sintaxis JS OK, manifest JSON OK, smoke HTTP en SQLite limpia (`/portal`, SW, manifest, register, me, catalog, 403 en pedido PENDING), navegador integrado renderiza acceso/registro, `pytest tests/test_portal_orders.py -q` verde y `pytest tests/test_events.py -q` verde.
+- Limitacion: la suite completa `pytest -q` supero 120s en local; se paro el uvicorn residual de pruebas antes de cerrar.
+- [BACKEND] Ejecutar juntos `pytest tests/test_portal_orders.py tests/test_events.py -q` reproduce timeout en `test_stream_emits_stock_event_on_movement` al crear producto, aunque ambas suites pasan por separado. Parece fixture/servidor de test tras P3+P4, no bloqueo de P5.

@@ -10,7 +10,7 @@ from fastapi import FastAPI, Request, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from fastapi.responses import HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse
 from sqlalchemy import select
 
 from slowapi import _rate_limit_exceeded_handler
@@ -162,8 +162,17 @@ async def login_page(request: Request):
     return templates.TemplateResponse(request, "login.html")
 
 
+@app.get("/portal-sw.js", include_in_schema=False)
+async def portal_service_worker():
+    return FileResponse(
+        os.path.join(STATIC_DIR, "js", "portal-sw.js"),
+        media_type="application/javascript",
+    )
+
+
 PAGES = {
     "/": "dashboard.html",
+    "/portal": "portal.html",
     "/products": "products.html",
     "/locations": "locations.html",
     "/movements": "movements.html",
