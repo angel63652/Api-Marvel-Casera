@@ -58,6 +58,7 @@ Ver detalle en `AUDITORIA.md` Â§2-Â§3 y Â§8.
 | P4 | Tiempo real stock (Redis pub/sub o LISTEN/NOTIFY → SSE) | backend | **Claude** | ✅ HECHO (2026-06-02) | broker in-proc `events.py` + SSE `GET /api/portal/catalog/stream`; notify en movimientos/órdenes/portal; 32 tests (4 nuevos, incl. SSE e2e) |
 | P5 | PWA portal cliente (separada de la interna) | frontend | **Codex** | ✅ HECHO (2026-06-02) | `/portal` con auth cliente, catalogo, carrito, pedidos, perfil/change-requests y stock SSE; PWA aislada (`portal_*`) |
 | P6 | Analítica con Polars (informes, ETL tarifas) | backend | **Claude** | ✅ HECHO (2026-06-02) | `GET /api/v1/analytics/sales-summary` + `POST /import-tier-prices` (CSV); Polars; 35 tests (3 nuevos) |
+| P7 | Refresh tokens del portal cliente | backend | **Claude** | EN CURSO (2026-06-02) | tabla `customer_refresh_tokens`; `/api/portal/auth/{refresh,logout}`; baja portal token a 30 min; contrato P8 para Codex |
 
 ---
 
