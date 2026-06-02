@@ -1,5 +1,5 @@
 from sqlalchemy import (
-    Column, Integer, String, Float, Boolean, DateTime, Text, ForeignKey,
+    Column, Integer, String, Float, Numeric, Boolean, DateTime, Text, ForeignKey,
     Enum as SAEnum, Date
 )
 from sqlalchemy.orm import relationship
@@ -46,7 +46,7 @@ class MovementLine(Base):
     product_id = Column(Integer, ForeignKey("products.id", ondelete="RESTRICT"), nullable=False, index=True)
     location_id = Column(Integer, ForeignKey("locations.id", ondelete="RESTRICT"), nullable=True)
     quantity = Column(Float, nullable=False)
-    unit_price = Column(Float, nullable=True)
+    unit_price = Column(Numeric(12, 2, asdecimal=False), nullable=True)  # money
     lot = Column(String(100), nullable=True)
     expiry_date = Column(Date, nullable=True)
 

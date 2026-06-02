@@ -1,5 +1,5 @@
 from sqlalchemy import (
-    Column, Integer, String, Float, Boolean, DateTime, Text, ForeignKey,
+    Column, Integer, String, Float, Numeric, Boolean, DateTime, Text, ForeignKey,
     Enum as SAEnum, Date, UniqueConstraint
 )
 from sqlalchemy.orm import relationship
@@ -43,7 +43,7 @@ class Employee(Base):
     position = Column(String(100), nullable=True)
     department = Column(String(100), nullable=True)
     hire_date = Column(Date, nullable=True)
-    salary_base = Column(Float, nullable=False, default=0.0)
+    salary_base = Column(Numeric(12, 2, asdecimal=False), nullable=False, default=0.0)  # money
     is_active = Column(Boolean, nullable=False, default=True)
     is_driver = Column(Boolean, nullable=False, default=False)
     role = Column(SAEnum(EmployeeRole), nullable=False, default=EmployeeRole.PICKER)
@@ -113,10 +113,10 @@ class Payroll(Base):
     )
     year = Column(Integer, nullable=False)
     month = Column(Integer, nullable=False)
-    salary_base = Column(Float, nullable=False)
-    bonuses = Column(Float, nullable=False, default=0.0)
-    deductions = Column(Float, nullable=False, default=0.0)
-    net_salary = Column(Float, nullable=False)
+    salary_base = Column(Numeric(12, 2, asdecimal=False), nullable=False)  # money
+    bonuses = Column(Numeric(12, 2, asdecimal=False), nullable=False, default=0.0)  # money
+    deductions = Column(Numeric(12, 2, asdecimal=False), nullable=False, default=0.0)  # money
+    net_salary = Column(Numeric(12, 2, asdecimal=False), nullable=False)  # money
     paid_at = Column(DateTime(timezone=True), nullable=True)
     paid_by = Column(Integer, ForeignKey("employees.id", ondelete="SET NULL"), nullable=True)
     notes = Column(Text, nullable=True)

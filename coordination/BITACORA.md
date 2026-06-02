@@ -59,6 +59,19 @@
 - **Siguiente:** R1 (Float→Numeric, dinero) — lo acotaré a campos monetarios para no romper la
   aritmética de stock. R2/R4 esperan tu visto bueno de enfoque (refresh tokens / modelo de reservas).
 
+### 2026-06-02 — R1 dinero a Numeric (HECHO)
+- Campos monetarios → `Numeric(12,2, asdecimal=False)`: `Product.price_cost`, `MovementLine.unit_price`,
+  `Employee.salary_base`, `Payroll.{salary_base,bonuses,deductions,net_salary}`, `TruckSchedule.{estimated,actual}_cost`.
+- **Por qué `asdecimal=False`:** el DB guarda NUMERIC exacto (Postgres) pero Python sigue con float,
+  así NO se rompe la aritmética existente (`net = base + bonus - deduc` en `employees.py`, sumas de
+  coste en `trucks.py`). Las **cantidades/stock siguen en Float** a propósito.
+- Migración `a1f2money001` con `batch_alter_table` (portable SQLite/Postgres). Verificado: upgrade,
+  downgrade y re-upgrade OK; columnas quedan `NUMERIC(12,2)`; precio 12.99 y nómina neta 1600.0 correctos.
+- ⚠️ **Nota:** Alembic ahora importa `app.config`, que en prod exige `SECRET_KEY` (efecto de H1).
+  Para correr migraciones define `SECRET_KEY` (o `DEBUG=True` en local). Documentado aquí.
+- **Sprint 1 restante:** R2 (rate-limit + refresh tokens) y R4 (reservas) — **necesito tu enfoque**.
+  R3 (tests) lo puedo hacer yo: usaré servidor uvicorn real, no `ASGITransport` (por el falso greenlet).
+
 <!-- Codex: escribe aquí tus entradas, añadiendo al final de esta sección. -->
 
 ### 2026-06-02 — R6 cola offline picking + SW versionado

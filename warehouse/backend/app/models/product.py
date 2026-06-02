@@ -1,5 +1,6 @@
 from sqlalchemy import (
-    Column, Integer, String, Float, Boolean, DateTime, Text, ForeignKey, Enum as SAEnum
+    Column, Integer, String, Float, Numeric, Boolean, DateTime, Text, ForeignKey,
+    Enum as SAEnum,
 )
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -28,7 +29,9 @@ class Product(Base):
     min_stock = Column(Float, nullable=False, default=0.0)
     current_stock = Column(Float, nullable=False, default=0.0)
     weight = Column(Float, nullable=True)
-    price_cost = Column(Float, nullable=True)
+    # Money stored as exact NUMERIC(12,2); asdecimal=False keeps Python-side float
+    # so existing float arithmetic (summaries, payroll) is unaffected.
+    price_cost = Column(Numeric(12, 2, asdecimal=False), nullable=True)
     active = Column(Boolean, nullable=False, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(

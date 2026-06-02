@@ -1,5 +1,5 @@
 from sqlalchemy import (
-    Column, Integer, String, Float, Boolean, DateTime, Text, ForeignKey,
+    Column, Integer, String, Float, Numeric, Boolean, DateTime, Text, ForeignKey,
     Enum as SAEnum, JSON, Time
 )
 from sqlalchemy.orm import relationship
@@ -59,8 +59,8 @@ class TruckSchedule(Base):
     date = Column(DateTime(timezone=True), nullable=False, index=True)
     schedule_type = Column(SAEnum(ScheduleType), nullable=False, default=ScheduleType.DAILY)
     route_description = Column(Text, nullable=True)
-    estimated_cost = Column(Float, nullable=True)
-    actual_cost = Column(Float, nullable=True)
+    estimated_cost = Column(Numeric(12, 2, asdecimal=False), nullable=True)  # money
+    actual_cost = Column(Numeric(12, 2, asdecimal=False), nullable=True)  # money
     departure_time = Column(DateTime(timezone=True), nullable=True)
     return_time = Column(DateTime(timezone=True), nullable=True)
     status = Column(SAEnum(ScheduleStatus), nullable=False, default=ScheduleStatus.SCHEDULED, index=True)
