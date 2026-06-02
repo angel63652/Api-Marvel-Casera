@@ -44,7 +44,7 @@ Ver detalle en `AUDITORIA.md` Â§2-Â§3 y Â§8.
 | C5 | EnvÃ­o real de notificaciones a oficina (SMTP/Gmail) | backend | â€” | LIBRE | `email_service.notify_office` |
 | C6 | Export Excel (camiones, nÃ³minas) | backend | **Claude** | ✅ HECHO (2026-06-02) | `excel_service.py` (openpyxl); `GET /trucks/schedules/history/export` y `GET /employees/payrolls/report/{y}/{m}/export`; 47 tests |
 | C7 | AprobaciÃ³n con contraseÃ±a en ajustes de stock | backend | **Claude** | ✅ HECHO (2026-06-02) | `POST /movements/adjustment` (MANAGER, re-verifica password, delta con signo); el genérico rechaza ADJUSTMENT; 43 tests |
-| C10 | Etiquetas de barcode (Pillow) | backend | â€” | LIBRE | |
+| C10 | Etiquetas de barcode (Pillow) | backend | **Claude** | ✅ HECHO (2026-06-02) | `barcode_service.py` (python-barcode+Pillow); `GET /products/{id}/label` → PNG; 52 tests |
 | C12 | PaginaciÃ³n frontend (consume R5) | frontend | **Codex** | HECHO (2026-06-02) | productos/ordenes/movimientos/ubicaciones consumen `limit`/`offset` + `X-Total-Count` |
 | C13 | UI analitica y carga de tarifas (consume P6) | frontend | **Codex** | HECHO (2026-06-03) | `dashboard.html`; consume `/analytics/sales-summary` y `/analytics/import-tier-prices` |
 | C14 | Precio congelado en líneas de pedido | backend | **Claude** | ✅ HECHO (2026-06-02) | `OrderLine.unit_price` capturado al crear (portal: tarifa; interno: base); respuesta usa el precio guardado; migración `a7b8olprice1`; 44 tests |

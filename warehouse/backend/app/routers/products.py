@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
+from fastapi.responses import Response as FastAPIResponse
 from sqlalchemy import select, or_, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Optional
@@ -14,6 +15,7 @@ from app.schemas.product import (
 )
 from app.auth import get_current_employee, require_role
 from app.services import stock_service
+from app.services.barcode_service import generate_label
 
 router = APIRouter(prefix="/products", tags=["Productos"])
 
@@ -115,6 +117,27 @@ async def get_product_stock(product_id: int, db: AsyncSession = Depends(get_db))
     data["stock_by_location"] = breakdown
     data["is_low_stock"] = product.current_stock < product.min_stock
     return ProductWithStock.model_validate(data)
+
+
+@router.get("/{product_id}/label")
+async def get_product_label(
+    product_id: int,
+    db: AsyncSession = Depends(get_db),
+    _: Employee = Depends(get_current_employee),
+):
+    """Return a printable PNG barcode label for the product."""
+    product = await db.get(Product, product_id)
+    if product is None:
+        raise HTTPException(status_code=404, detail="Producto no encontrado")
+    barcode_val = product.barcode or product.niu
+    if not barcode_val:
+        raise HTTPException(status_code=422, detail="El producto no tiene código de barras ni NIU")
+    png_bytes = generate_label(barcode_val, product.name or "", product.niu or "")
+    return FastAPIResponse(
+        content=png_bytes,
+        media_type="image/png",
+        headers={"Content-Disposition": f'attachment; filename="label_{product_id}.png"'},
+    )
 
 
 @router.post("", response_model=ProductResponse, status_code=201)
