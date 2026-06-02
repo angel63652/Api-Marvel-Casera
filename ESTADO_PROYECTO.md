@@ -169,7 +169,7 @@ Verificado arrancando el servidor con SQLite y `curl`:
     no se ha validado el cableado contra la API real.
   - Páginas a revisar: `products`, `orders`, `picking`, `trucks`, `employees`, `emails`.
 
-- [ ] **C3 — Migraciones Alembic.**
+- [x] **C3 — Migraciones Alembic.**
   - `alembic init`, configurar `env.py` para `Base.metadata` async, primera revisión.
   - Hoy las tablas se crean con `create_all` en startup (suficiente para dev, no para prod).
 
