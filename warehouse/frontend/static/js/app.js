@@ -21,14 +21,15 @@ async function api(method, path, body = null) {
 
   try {
     const res = await fetch(`/api/v1${path}`, opts);
-    const contentType = res.headers.get('Content-Type') || '';
-    const isJson = contentType.includes('application/json');
 
     if (res.status === 401) {
       clearSession();
       window.location.replace('/login');
-      throw new Error('Sesión caducada');
+      return;
     }
+
+    const contentType = res.headers.get('Content-Type') || '';
+    const isJson = contentType.includes('application/json');
 
     if (!res.ok) {
       let errMsg = `Error ${res.status}: ${res.statusText}`;
@@ -65,7 +66,7 @@ function clearSession() {
 
 function logout() {
   clearSession();
-  window.location.href = '/login';
+  window.location.replace('/login');
 }
 
 function getCurrentUser() {

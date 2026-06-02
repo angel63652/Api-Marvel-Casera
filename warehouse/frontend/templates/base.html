@@ -21,6 +21,8 @@
 </head>
 <body class="h-full bg-gray-50" x-data="{ sidebarOpen: false, submenu: {} }">
 
+<script>if (!localStorage.getItem('wms_token')) { window.location.replace('/login'); }</script>
+
 <!-- Toast container -->
 <div id="toast-container"></div>
 
@@ -232,7 +234,7 @@
 
       <!-- User avatar -->
       <span class="hidden sm:block text-sm font-medium text-gray-700 max-w-[180px] truncate" data-current-user-name>Usuario</span>
-      <div class="w-8 h-8 rounded-full bg-blue-800 text-white flex items-center justify-center text-sm font-bold cursor-pointer" title="Perfil" data-current-user-initials>
+      <div class="w-8 h-8 rounded-full bg-blue-800 text-white flex items-center justify-center text-sm font-bold cursor-pointer" data-current-user-initials>
         U
       </div>
     </div>
