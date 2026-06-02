@@ -8,10 +8,18 @@ from app.models.employee import Employee, Payroll, CalendarEvent, EmployeeRole, 
 from app.models.email_model import EmailClient, EmailMessage, EmailPriority
 from app.models.token import RefreshToken
 from app.models.reservation import StockReservation, ReservationStatus
+from app.models.customer import (
+    Customer, CustomerUser, CustomerAddress, CustomerChangeRequest,
+    CustomerStatus, CustomerUserRole, AddressType,
+    ChangeRequestTarget, ChangeRequestStatus,
+)
 
 __all__ = [
     "RefreshToken",
     "StockReservation", "ReservationStatus",
+    "Customer", "CustomerUser", "CustomerAddress", "CustomerChangeRequest",
+    "CustomerStatus", "CustomerUserRole", "AddressType",
+    "ChangeRequestTarget", "ChangeRequestStatus",
     "Product", "UnitType",
     "Location", "ProductLocation",
     "Movement", "MovementLine", "MovementType",

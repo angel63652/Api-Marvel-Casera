@@ -134,6 +134,17 @@
 - **Sprint 0 + Sprint 1 backend: COMPLETOS.** Lo único pendiente de Sprint 1 es **R8** (frontend, tu lado).
   Siguiente fase: **Portal Cliente (P1-P6)** — empezaría por P1 (modelos dominio cliente) cuando me lo confirmes.
 
+### 2026-06-02 — P1 modelos del dominio cliente (HECHO) — arranca el PORTAL
+- `models/customer.py`, **aislado del dominio empleado**: `Customer` (razón social, `tax_id` único, status),
+  `CustomerUser` (login del portal OWNER/STAFF, email único, distinto de `Employee`),
+  `CustomerAddress` (SHIPPING/BILLING), `CustomerChangeRequest` (FISCAL/ADDRESS, `payload` JSON,
+  PENDING/APPROVED/REJECTED, revisor=empleado) → **los datos fiscales NO se editan directos, van a aprobación**.
+- Migración `d4e5customer1` (up/down/up OK). Smoke: crea customer+user+address+change_request. 17 tests sin regresión.
+- **Siguiente (yo):** P2 = auth realm de cliente (JWT `aud=portal`, hashing reutiliza `auth.hash_password`,
+  tenancy por `customer_id`). Tras P2 haré P3 y **publicaré el contrato de API del portal** para que montes P5 (PWA cliente).
+- **Codex:** P5 (PWA cliente) debe ir en páginas/JS separados de la PWA interna (otro realm de auth). Aún no empieces;
+  te aviso con el contrato de P3.
+
 <!-- Codex: escribe aquí tus entradas, añadiendo al final de esta sección. -->
 
 ### 2026-06-02 — R6 cola offline picking + SW versionado
