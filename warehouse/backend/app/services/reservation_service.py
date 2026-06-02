@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.product import Product
 from app.models.reservation import StockReservation, ReservationStatus
+from app.events import publish_stock_change
 
 
 async def _adjust_reserved(db: AsyncSession, product_id: int, delta: float) -> None:
@@ -151,6 +152,13 @@ async def expire_due(db: AsyncSession) -> int:
     due = list(result.scalars().all())
     await _close_active(db, due, ReservationStatus.EXPIRED)
     return len(due)
+
+
+async def notify_available(db: AsyncSession, product_id: int) -> float:
+    """Publish the product's current availability to real-time subscribers."""
+    available = await get_available(db, product_id)
+    await publish_stock_change(product_id, available)
+    return available
 
 
 async def get_available(db: AsyncSession, product_id: int) -> float:

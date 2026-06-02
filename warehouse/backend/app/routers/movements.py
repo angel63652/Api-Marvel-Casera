@@ -10,7 +10,7 @@ from app.models.product import Product
 from app.models.employee import Employee
 from app.schemas.movement import MovementCreate, MovementResponse, MovementLineResponse
 from app.auth import require_role, get_current_employee
-from app.services import stock_service
+from app.services import stock_service, reservation_service
 
 router = APIRouter(prefix="/movements", tags=["Movimientos"])
 
@@ -179,6 +179,9 @@ async def create_movement(
             )
 
     await db.flush()
+    # Real-time: stock changed for the affected products.
+    for pid in {line.product_id for line in payload.lines}:
+        await reservation_service.notify_available(db, pid)
     # Re-select so selectin loaders populate lines + their product/location within
     # the async context (avoids a lazy load during sync serialization).
     movement = (

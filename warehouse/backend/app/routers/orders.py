@@ -177,6 +177,8 @@ async def create_order(
         await reservation_service.reserve(
             db, line_in.product_id, line_in.quantity_requested, order_id=order.id
         )
+    for pid in {l.product_id for l in payload.lines}:
+        await reservation_service.notify_available(db, pid)
     await db.refresh(order)
     return _serialize(order)
 
@@ -195,6 +197,13 @@ async def update_order_status(
     # Cancelling/returning frees the order's stock holds.
     if status in (OrderStatus.CANCELLED, OrderStatus.RETURNED):
         await reservation_service.release_for_order(db, order_id)
+        pids = (
+            await db.execute(
+                select(OrderLine.product_id).where(OrderLine.order_id == order_id)
+            )
+        ).scalars().all()
+        for pid in set(pids):
+            await reservation_service.notify_available(db, pid)
     await db.flush()
     await db.refresh(order)
     return _serialize(order)
@@ -332,6 +341,8 @@ async def confirm_order(
 
     # Stock has physically left: free this order's holds (CONSUMED).
     await reservation_service.consume_for_order(db, order_id)
+    for pid in {l.product_id for l in order.lines}:
+        await reservation_service.notify_available(db, pid)
 
     order.conformity_signed = True
     order.conformity_at = datetime.now(timezone.utc)
@@ -357,6 +368,13 @@ async def return_order(
     order.return_reason = payload.return_reason
     # Free any remaining holds for this order.
     await reservation_service.release_for_order(db, order_id)
+    pids = (
+        await db.execute(
+            select(OrderLine.product_id).where(OrderLine.order_id == order_id)
+        )
+    ).scalars().all()
+    for pid in set(pids):
+        await reservation_service.notify_available(db, pid)
     await db.flush()
     await db.refresh(order)
     return _serialize(order)

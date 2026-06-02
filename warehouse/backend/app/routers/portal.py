@@ -4,10 +4,16 @@ All endpoints require a portal token and are scoped to the caller's customer
 (tenancy). Portal orders never oversell: stock is reserved atomically with an
 availability check (`reserve_if_available`).
 """
+import asyncio
+import json
+
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
+from fastapi.responses import StreamingResponse
 from sqlalchemy import select, func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.events import broker
 
 from app.database import get_db
 from app.auth import get_current_customer_user
@@ -68,6 +74,33 @@ async def catalog(
             )
         )
     return items
+
+
+@router.get("/catalog/stream")
+async def catalog_stream(
+    user: CustomerUser = Depends(get_current_customer_user),
+):
+    """Server-Sent Events stream of stock-availability changes (real-time).
+
+    Emits `event: stock` with `{product_id, available_stock}` whenever stock
+    changes, plus periodic heartbeats to keep the connection alive.
+    """
+    async def event_gen():
+        # Immediate comment so the client knows it's connected.
+        yield ": connected\n\n"
+        async with broker.subscribe() as q:
+            while True:
+                try:
+                    event = await asyncio.wait_for(q.get(), timeout=15)
+                    yield f"event: {event.get('type','message')}\ndata: {json.dumps(event)}\n\n"
+                except asyncio.TimeoutError:
+                    yield ": keep-alive\n\n"  # heartbeat
+
+    return StreamingResponse(
+        event_gen(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 
 # ---- Orders ----------------------------------------------------------------
@@ -162,6 +195,9 @@ async def create_portal_order(
             status=OrderLineStatus.PENDING,
         ))
     await db.flush()
+    # Real-time: availability dropped for the ordered products.
+    for pid in {item.product_id for item in payload.items}:
+        await reservation_service.notify_available(db, pid)
     order = (await db.execute(select(Order).where(Order.id == order.id))).scalar_one()
     return await _build_order_response(order, customer.price_tier, db)
 

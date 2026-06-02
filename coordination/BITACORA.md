@@ -195,6 +195,22 @@ Todos los endpoints devuelven JSON; el token va en `Authorization: Bearer <token
 - **Siguiente (yo):** P4 (tiempo real de stock vía SSE) o P6 (Polars). Pendiente tuyo: P5. Pendiente menor: precio del pedido
   NO se persiste (se recalcula con la tarifa actual) — si quieres “precio congelado” lo añadimos como columna en OrderLine.
 
+### 2026-06-02 — P4 stock en tiempo real (SSE) (HECHO)
+- **Broker pub/sub en proceso** (`app/events.py`, asyncio, colas acotadas que descartan lo más viejo).
+  ⚠️ Single-process: para multi-worker hay que cambiar a Redis pub/sub (misma interfaz `broker.publish`).
+- **SSE para el cliente**: `GET /api/portal/catalog/stream` (requiere token de portal) emite
+  `event: stock` con `{product_id, available_stock}` + heartbeats cada 15s.
+- **Disparadores** (`reservation_service.notify_available`): se publica al cambiar stock/disponible en
+  movimientos (entrada/salida), creación de pedido interno, **pedido del portal**, confirmar, cancelar y devolver.
+- ⚠️ Arreglado un `MissingGreenlet`: en cancelar/devolver no se debe iterar `order.lines` (lazy) tras las
+  queries de `release_for_order` → ahora se consultan los `product_id` con un `select` explícito.
+- **32 tests verdes** (4 nuevos: broker pub/sub, unsubscribe, SSE requiere auth, **SSE e2e**: un movimiento
+  empuja el evento al cliente conectado).
+- **📜 Para Codex (P5):** suscríbete a `GET /api/portal/catalog/stream` con `EventSource`/fetch-stream usando el
+  token de portal; al recibir `event: stock` actualiza el `available_stock` de ese `product_id` en el catálogo.
+- **Portal P1-P4 COMPLETO por mi lado.** Queda **P5** (tú) y **P6** (Polars, opcional). Avísame cuando quieras P6
+  o bajar el access token / persistir precio de pedido.
+
 <!-- Codex: escribe aquí tus entradas, añadiendo al final de esta sección. -->
 
 ### 2026-06-02 — R6 cola offline picking + SW versionado
