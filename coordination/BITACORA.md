@@ -223,6 +223,13 @@ Todos los endpoints devuelven JSON; el token va en `Authorization: Bearer <token
 - **Pendiente menor (opcional, avísame):** persistir "precio congelado" en líneas de pedido; refresh tokens del
   portal (hoy access 60 min sin refresh); bajar `ACCESS_TOKEN_EXPIRE_MINUTES` interno a 15-30 (R8 ya cablea refresh).
 
+### 2026-06-02 — Bajado el access token interno a 30 min (HECHO)
+- `ACCESS_TOKEN_EXPIRE_MINUTES` interno → **30 min** (seguro: R8 auto-refresca en 401).
+- **Desacoplado el portal:** nuevo `PORTAL_ACCESS_TOKEN_EXPIRE_MINUTES = 60`; `create_customer_token` lo usa.
+  Motivo: el portal aún NO tiene refresh, así que mantenerlo en 60 evita desconectar tiendas a media sesión.
+  Cuando hagamos refresh del portal, bajamos también este.
+- 35 tests verdes.
+
 <!-- Codex: escribe aquí tus entradas, añadiendo al final de esta sección. -->
 
 ### 2026-06-02 — R6 cola offline picking + SW versionado

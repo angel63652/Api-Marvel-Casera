@@ -31,10 +31,12 @@ class Settings(BaseSettings):
     )
 
     ALGORITHM: str = "HS256"
-    # Short-lived access token; long-lived revocable refresh token.
-    # 60 min interim; drop to 15-30 once the frontend wires auto-refresh.
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
+    # Internal app: short-lived access token (the frontend auto-refreshes, R8).
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     REFRESH_TOKEN_EXPIRE_DAYS: int = 30
+    # Client portal has no refresh yet → keep its access token longer to avoid
+    # logging shops out mid-session. Lower once portal refresh ships.
+    PORTAL_ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
     # Rate limit for the login endpoint (SlowAPI syntax).
     LOGIN_RATE_LIMIT: str = "10/minute"
 

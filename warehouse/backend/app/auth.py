@@ -137,7 +137,7 @@ def reject_if_customer(payload: dict) -> None:
 def create_customer_token(customer_user_id: int, customer_id: int) -> str:
     """Access token for the client portal (separate realm via aud/type)."""
     expire = datetime.now(timezone.utc) + timedelta(
-        minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES
+        minutes=settings.PORTAL_ACCESS_TOKEN_EXPIRE_MINUTES
     )
     return jwt.encode(
         {
