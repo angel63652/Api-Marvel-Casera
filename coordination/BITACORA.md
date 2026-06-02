@@ -251,6 +251,17 @@ En `portal.js` (mismo patrón que R8 pero con keys del portal):
 - **Estado:** roadmap + opcionales casi cerrados. Quedan opcionales menores: precio congelado en líneas de pedido,
   y C4-C7/C10 internos. Avísame.
 
+### 2026-06-02 — C7 ajuste de stock con contraseña (HECHO)
+- Nuevo **`POST /api/v1/movements/adjustment`** (rol MANAGER; ADMIN pasa): body `{product_id, location_id?,
+  quantity (con signo), reason, password}`. **Re-verifica la contraseña del propio usuario** antes de aplicar.
+- El endpoint genérico `POST /movements` ahora **rechaza `type=ADJUSTMENT`** (403) y remite al gated.
+- El ajuste crea un `Movement` ADJUSTMENT + línea con cantidad firmada y aplica el delta (atómico) + notify SSE.
+- **43 tests verdes** (4 nuevos: ajuste +5/−4 con password OK; password incorrecta→401; ADJUSTMENT genérico→403;
+  rol no-MANAGER→403).
+- **📌 Codex (frontend, opcional):** en `movements.html`/`dashboard.html`, el ajuste de stock debe pedir la
+  contraseña del usuario y llamar a `/movements/adjustment` (no al genérico).
+- **Pendiente opcional:** precio congelado en líneas de pedido; C6 (Excel), C10 (etiquetas barcode); C4/C5 (Gmail/SMTP, requieren credenciales).
+
 <!-- Codex: escribe aquí tus entradas, añadiendo al final de esta sección. -->
 
 ### 2026-06-02 — R6 cola offline picking + SW versionado

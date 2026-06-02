@@ -8,8 +8,10 @@ from app.database import get_db
 from app.models.movement import Movement, MovementLine, MovementType
 from app.models.product import Product
 from app.models.employee import Employee
-from app.schemas.movement import MovementCreate, MovementResponse, MovementLineResponse
-from app.auth import require_role, get_current_employee
+from app.schemas.movement import (
+    MovementCreate, MovementResponse, MovementLineResponse, StockAdjustmentRequest,
+)
+from app.auth import require_role, get_current_employee, verify_password
 from app.services import stock_service, reservation_service
 
 router = APIRouter(prefix="/movements", tags=["Movimientos"])
@@ -137,6 +139,11 @@ async def create_movement(
     db: AsyncSession = Depends(get_db),
     current: Employee = Depends(require_role("MANAGER", "OFFICE", "PICKER")),
 ):
+    if payload.type == MovementType.ADJUSTMENT:
+        raise HTTPException(
+            status_code=403,
+            detail="Los ajustes de stock requieren aprobación: usa POST /movements/adjustment",
+        )
     movement = Movement(
         type=payload.type,
         reference=payload.reference,
@@ -184,6 +191,57 @@ async def create_movement(
         await reservation_service.notify_available(db, pid)
     # Re-select so selectin loaders populate lines + their product/location within
     # the async context (avoids a lazy load during sync serialization).
+    movement = (
+        await db.execute(select(Movement).where(Movement.id == movement.id))
+    ).scalar_one()
+    return _serialize(movement)
+
+
+@router.post("/adjustment", response_model=MovementResponse, status_code=201)
+async def create_stock_adjustment(
+    payload: StockAdjustmentRequest,
+    db: AsyncSession = Depends(get_db),
+    current: Employee = Depends(require_role("MANAGER")),
+):
+    """Manual stock correction (ADJUSTMENT) gated by manager password re-auth.
+
+    Sensitive: it sets an arbitrary signed delta on stock, so we re-verify the
+    caller's password before applying it. Routed here instead of the generic
+    movements endpoint, which rejects ADJUSTMENT.
+    """
+    if not verify_password(payload.password, current.hashed_password):
+        raise HTTPException(status_code=401, detail="Contraseña incorrecta")
+    if payload.quantity == 0:
+        raise HTTPException(status_code=400, detail="El ajuste no puede ser 0")
+
+    product = await db.get(Product, payload.product_id)
+    if product is None:
+        raise HTTPException(status_code=404, detail="Producto no encontrado")
+
+    movement = Movement(
+        type=MovementType.ADJUSTMENT,
+        reference="ADJUSTMENT",
+        date=datetime.utcnow(),
+        notes=payload.reason,
+        user_id=current.id,
+    )
+    db.add(movement)
+    await db.flush()
+    db.add(MovementLine(
+        movement_id=movement.id,
+        product_id=payload.product_id,
+        location_id=payload.location_id,
+        quantity=payload.quantity,  # signed
+    ))
+    # ADJUSTMENT delta carries its own sign.
+    await stock_service.apply_movement_delta(payload.product_id, payload.quantity, db)
+    if payload.location_id:
+        await stock_service.update_location_load(payload.location_id, payload.quantity, db)
+        await stock_service.update_product_location_qty(
+            payload.product_id, payload.location_id, payload.quantity, db
+        )
+    await db.flush()
+    await reservation_service.notify_available(db, payload.product_id)
     movement = (
         await db.execute(select(Movement).where(Movement.id == movement.id))
     ).scalar_one()

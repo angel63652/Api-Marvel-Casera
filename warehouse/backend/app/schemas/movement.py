@@ -23,6 +23,15 @@ class MovementCreate(BaseModel):
     lines: list[MovementLineCreate] = Field(..., min_length=1)
 
 
+class StockAdjustmentRequest(BaseModel):
+    """Sensitive manual stock correction — requires manager password re-auth."""
+    product_id: int
+    location_id: Optional[int] = None
+    quantity: float = Field(..., description="Signed delta (+/-) to apply to stock")
+    reason: str = Field(..., min_length=3, max_length=255)
+    password: str = Field(..., description="Caller's password, re-verified")
+
+
 class MovementLineResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
