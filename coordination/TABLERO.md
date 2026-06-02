@@ -47,8 +47,8 @@ Ver detalle en `AUDITORIA.md` Â§2-Â§3 y Â§8.
 | C10 | Etiquetas de barcode (Pillow) | backend | â€” | LIBRE | |
 | C12 | PaginaciÃ³n frontend (consume R5) | frontend | **Codex** | HECHO (2026-06-02) | productos/ordenes/movimientos/ubicaciones consumen `limit`/`offset` + `X-Total-Count` |
 | C13 | UI analitica y carga de tarifas (consume P6) | frontend | **Codex** | HECHO (2026-06-03) | `dashboard.html`; consume `/analytics/sales-summary` y `/analytics/import-tier-prices` |
-| C15 | UI ajuste de stock con contrasena (consume C7) | frontend | **Codex** | EN CURSO (2026-06-03) | `movements.html`; pedir password y llamar `/movements/adjustment` |
 | C14 | Precio congelado en líneas de pedido | backend | **Claude** | ✅ HECHO (2026-06-02) | `OrderLine.unit_price` capturado al crear (portal: tarifa; interno: base); respuesta usa el precio guardado; migración `a7b8olprice1`; 44 tests |
+| C15 | UI ajuste de stock con contrasena (consume C7) | frontend | **Codex** | HECHO (2026-06-03) | `movements.html`; pide password y llama `/movements/adjustment` |
 
 ## ðŸ”µ Portal Cliente (ver `PROPUESTA_PORTAL_CLIENTE.md`) â€” tras Sprint 0/1
 

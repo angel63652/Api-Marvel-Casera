@@ -343,3 +343,10 @@ En `portal.js` (mismo patrón que R8 pero con keys del portal):
 - Stream SSE de stock intenta refrescar en 401 y reinicia la conexion si obtiene un access nuevo.
 - `portal-sw.js` sube a `2026-06-03-p8` para invalidar la cache de `portal.js`.
 - Verificacion: `node --check` en `portal.js` y `portal-sw.js`, mock Node de refresh+retry/preservar refresh/logout, `pytest tests/test_portal_refresh.py -q --tb=short` verde.
+
+### 2026-06-03 — C15 UI ajuste de stock con contrasena
+- Claim respetado: solo `movements.html` y cierre en tablero/bitacora.
+- Movimientos incorpora pestana Ajustes, boton "Ajuste Stock" visible para ADMIN/MANAGER y modal especifico con producto, delta firmado, motivo y contrasena.
+- El ajuste llama a `POST /api/v1/movements/adjustment`; entradas/salidas siguen usando `POST /movements`.
+- La tabla representa `ADJUSTMENT` como Ajuste, con badge amber y cantidad firmada.
+- Verificacion: parseo del script inline con Node empaquetado, mock Node del flujo frontend, `pytest tests/test_adjustment.py -q --tb=short` verde y smoke HTTP live: entrada 10, ajuste -3, stock final 7, password incorrecta 401, filtro `type=ADJUSTMENT` OK.
