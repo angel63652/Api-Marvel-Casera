@@ -38,9 +38,19 @@ class CustomerUserResponse(BaseModel):
 
 class PortalTokenResponse(BaseModel):
     access_token: str
+    refresh_token: Optional[str] = None
     token_type: str = "bearer"
     user: CustomerUserResponse
     customer: CustomerSummary
+
+
+class PortalRefreshRequest(BaseModel):
+    refresh_token: str
+
+
+class PortalAccessTokenResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
 
 
 # ---- Catalog ---------------------------------------------------------------

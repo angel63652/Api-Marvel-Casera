@@ -152,6 +152,43 @@ def create_customer_token(customer_user_id: int, customer_id: int) -> str:
     )
 
 
+def create_customer_refresh_token(customer_user_id: int) -> tuple[str, str, datetime]:
+    """Build a portal refresh JWT. Returns (token, jti, expires_at)."""
+    jti = uuid.uuid4().hex
+    expires_at = datetime.now(timezone.utc) + timedelta(
+        days=settings.REFRESH_TOKEN_EXPIRE_DAYS
+    )
+    token = jwt.encode(
+        {
+            "sub": str(customer_user_id),
+            "jti": jti,
+            "type": "customer_refresh",
+            "aud": "portal",
+            "exp": expires_at,
+        },
+        settings.SECRET_KEY,
+        algorithm=settings.ALGORITHM,
+    )
+    return token, jti, expires_at
+
+
+def decode_customer_refresh_token(token: str) -> dict:
+    """Decode/validate a portal refresh JWT (signature, expiry, aud, type)."""
+    try:
+        payload = jwt.decode(
+            token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM], audience="portal"
+        )
+    except JWTError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Token de refresco inválido"
+        )
+    if payload.get("type") != "customer_refresh":
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Token de refresco inválido"
+        )
+    return payload
+
+
 async def get_current_customer_user(
     token: Optional[str] = Depends(oauth2_scheme),
     db: AsyncSession = Depends(get_db),

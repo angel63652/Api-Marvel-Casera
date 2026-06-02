@@ -34,9 +34,8 @@ class Settings(BaseSettings):
     # Internal app: short-lived access token (the frontend auto-refreshes, R8).
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     REFRESH_TOKEN_EXPIRE_DAYS: int = 30
-    # Client portal has no refresh yet → keep its access token longer to avoid
-    # logging shops out mid-session. Lower once portal refresh ships.
-    PORTAL_ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
+    # Client portal access token; short-lived now that the portal has refresh.
+    PORTAL_ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     # Rate limit for the login endpoint (SlowAPI syntax).
     LOGIN_RATE_LIMIT: str = "10/minute"
 

@@ -13,23 +13,38 @@ from app.config import settings
 from app.limiter import limiter
 from app.auth import (
     hash_password, verify_password, create_customer_token, get_current_customer_user,
+    create_customer_refresh_token, decode_customer_refresh_token,
 )
 from app.models.customer import (
     Customer, CustomerUser, CustomerStatus, CustomerUserRole,
 )
+from app.models.token import CustomerRefreshToken
 from app.schemas.portal import (
     PortalRegisterRequest, PortalLoginRequest, PortalTokenResponse,
+    PortalRefreshRequest, PortalAccessTokenResponse,
     CustomerUserResponse, CustomerSummary,
 )
 
 router = APIRouter(prefix="/api/portal/auth", tags=["Portal · Auth"])
 
 
-def _token_response(user: CustomerUser, customer: Customer) -> PortalTokenResponse:
+async def _issue_customer_refresh(customer_user_id: int, db: AsyncSession) -> str:
+    token, jti, expires_at = create_customer_refresh_token(customer_user_id)
+    db.add(CustomerRefreshToken(
+        jti=jti, customer_user_id=customer_user_id, expires_at=expires_at
+    ))
+    await db.flush()
+    return token
+
+
+def _token_response(
+    user: CustomerUser, customer: Customer, refresh: str | None = None
+) -> PortalTokenResponse:
     role = user.role.value if hasattr(user.role, "value") else user.role
     status_v = customer.status.value if hasattr(customer.status, "value") else customer.status
     return PortalTokenResponse(
         access_token=create_customer_token(user.id, user.customer_id),
+        refresh_token=refresh,
         token_type="bearer",
         user=CustomerUserResponse(
             id=user.id, customer_id=user.customer_id, email=user.email,
@@ -82,7 +97,8 @@ async def register(
     )
     db.add(user)
     await db.flush()
-    return _token_response(user, customer)
+    refresh = await _issue_customer_refresh(user.id, db)
+    return _token_response(user, customer, refresh)
 
 
 @router.post("/login", response_model=PortalTokenResponse)
@@ -101,7 +117,53 @@ async def login(
     customer = await db.get(Customer, user.customer_id)
     if customer is None or customer.status == CustomerStatus.SUSPENDED:
         raise HTTPException(status_code=403, detail="Cuenta suspendida")
-    return _token_response(user, customer)
+    refresh = await _issue_customer_refresh(user.id, db)
+    return _token_response(user, customer, refresh)
+
+
+@router.post("/refresh", response_model=PortalAccessTokenResponse)
+async def refresh_token(payload: PortalRefreshRequest, db: AsyncSession = Depends(get_db)):
+    """Exchange a valid, non-revoked portal refresh token for a new access token."""
+    data = decode_customer_refresh_token(payload.refresh_token)
+    jti = data.get("jti")
+    user_id = data.get("sub")
+    if not jti or not user_id:
+        raise HTTPException(status_code=401, detail="Token de refresco inválido")
+
+    stored = (
+        await db.execute(select(CustomerRefreshToken).where(CustomerRefreshToken.jti == jti))
+    ).scalar_one_or_none()
+    if stored is None or stored.revoked:
+        raise HTTPException(status_code=401, detail="Sesión revocada o inexistente")
+
+    user = await db.get(CustomerUser, int(user_id))
+    if user is None or not user.is_active:
+        raise HTTPException(status_code=401, detail="Usuario no encontrado o inactivo")
+    customer = await db.get(Customer, user.customer_id)
+    if customer is None or customer.status == CustomerStatus.SUSPENDED:
+        raise HTTPException(status_code=403, detail="Cuenta suspendida")
+
+    return PortalAccessTokenResponse(
+        access_token=create_customer_token(user.id, user.customer_id), token_type="bearer"
+    )
+
+
+@router.post("/logout")
+async def logout(payload: PortalRefreshRequest, db: AsyncSession = Depends(get_db)):
+    """Revoke a portal refresh token (idempotent)."""
+    try:
+        data = decode_customer_refresh_token(payload.refresh_token)
+    except HTTPException:
+        return {"detail": "Sesión cerrada"}
+    jti = data.get("jti")
+    if jti:
+        stored = (
+            await db.execute(select(CustomerRefreshToken).where(CustomerRefreshToken.jti == jti))
+        ).scalar_one_or_none()
+        if stored is not None:
+            stored.revoked = True
+            await db.flush()
+    return {"detail": "Sesión cerrada"}
 
 
 @router.get("/me", response_model=PortalTokenResponse)

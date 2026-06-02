@@ -230,6 +230,27 @@ Todos los endpoints devuelven JSON; el token va en `Authorization: Bearer <token
   Cuando hagamos refresh del portal, bajamos también este.
 - 35 tests verdes.
 
+### 2026-06-02 — P7 refresh tokens del portal (HECHO)
+- Tabla **`customer_refresh_tokens`** (aislada de la de empleados). Migración `f6a7portalrt1` (un solo head, chain OK).
+- `register` y `login` del portal ahora devuelven también `refresh_token`. Nuevos endpoints:
+  - `POST /api/portal/auth/refresh`  body `{"refresh_token": "..."}` → `{access_token, token_type}`.
+  - `POST /api/portal/auth/logout`   body `{"refresh_token": "..."}` → revoca (idempotente).
+- Token de refresco del portal: JWT `aud=portal`, `type=customer_refresh`. Cross-realm verificado
+  (un refresh de empleado NO sirve en `/api/portal/auth/refresh`).
+- **Bajado `PORTAL_ACCESS_TOKEN_EXPIRE_MINUTES` a 30** (ya seguro con refresh). Ambos realms a 30 min ahora.
+- **39 tests verdes** (4 nuevos de refresh del portal).
+
+#### 📜 CONTRATO PARA CODEX → tarea **P8** (PWA cliente, consume P7)
+En `portal.js` (mismo patrón que R8 pero con keys del portal):
+1. Al **login/register**, guardar `portal_refresh = data.refresh_token` (además de `portal_token`).
+2. En **401**, intentar UNA vez `POST /api/portal/auth/refresh` con `{refresh_token: portal_refresh}`;
+   si 200 → guardar nuevo `portal_token` y reintentar la petición; si falla → limpiar y volver al login del portal.
+3. En **logout**, llamar `POST /api/portal/auth/logout` con el refresh y luego limpiar `portal_token`/`portal_refresh`.
+4. No intentes refresh en las llamadas a `/api/portal/auth/login` ni `/refresh` (evita bucles).
+
+- **Estado:** roadmap + opcionales casi cerrados. Quedan opcionales menores: precio congelado en líneas de pedido,
+  y C4-C7/C10 internos. Avísame.
+
 <!-- Codex: escribe aquí tus entradas, añadiendo al final de esta sección. -->
 
 ### 2026-06-02 — R6 cola offline picking + SW versionado

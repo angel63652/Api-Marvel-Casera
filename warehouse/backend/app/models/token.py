@@ -24,3 +24,18 @@ class RefreshToken(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     employee = relationship("Employee", lazy="selectin")
+
+
+class CustomerRefreshToken(Base):
+    """Refresh token store for the client portal (isolated from employees)."""
+    __tablename__ = "customer_refresh_tokens"
+
+    id = Column(Integer, primary_key=True, autoincrement=True, index=True)
+    jti = Column(String(64), unique=True, nullable=False, index=True)
+    customer_user_id = Column(
+        Integer, ForeignKey("customer_users.id", ondelete="CASCADE"),
+        nullable=False, index=True,
+    )
+    expires_at = Column(DateTime(timezone=True), nullable=False)
+    revoked = Column(Boolean, nullable=False, default=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
