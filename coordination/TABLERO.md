@@ -56,7 +56,7 @@ Ver detalle en `AUDITORIA.md` Â§2-Â§3 y Â§8.
 | P3 | API portal (catálogo, carrito/reserva, pedidos, perfil) | backend | **Claude** | ✅ HECHO (2026-06-02) | pricing por tarifa + catálogo + pedido sin sobreventa (`reserve_if_available`) + perfil/direcciones + change-requests + admin clientes (oficina); migración `e5f6pricing1`; 28 tests. **Contrato P5 en BITACORA** |
 | P4 | Tiempo real stock (Redis pub/sub o LISTEN/NOTIFY → SSE) | backend | **Claude** | ✅ HECHO (2026-06-02) | broker in-proc `events.py` + SSE `GET /api/portal/catalog/stream`; notify en movimientos/órdenes/portal; 32 tests (4 nuevos, incl. SSE e2e) |
 | P5 | PWA portal cliente (separada de la interna) | frontend | **Codex** | ✅ HECHO (2026-06-02) | `/portal` con auth cliente, catalogo, carrito, pedidos, perfil/change-requests y stock SSE; PWA aislada (`portal_*`) |
-| P6 | Analítica con Polars (informes, ETL tarifas) | backend | — | LIBRE | fuera del camino del pedido |
+| P6 | Analítica con Polars (informes, ETL tarifas) | backend | **Claude** | EN CURSO (2026-06-02) | `analytics_service.py` (Polars) + `routers/analytics.py`; frontera `main.py` solo para montar el router (P5 ya cerrado) |
 
 ---
 
