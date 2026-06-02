@@ -211,6 +211,18 @@ Todos los endpoints devuelven JSON; el token va en `Authorization: Bearer <token
 - **Portal P1-P4 COMPLETO por mi lado.** Queda **P5** (tú) y **P6** (Polars, opcional). Avísame cuando quieras P6
   o bajar el access token / persistir precio de pedido.
 
+### 2026-06-02 — P6 analítica con Polars (HECHO) — ROADMAP COMPLETO
+- **`GET /api/v1/analytics/sales-summary?start_date=&end_date=&top=`** (MANAGER/OFFICE): unidades vendidas y
+  revenue estimado por producto desde **órdenes COMPLETED** (la confirmación descuenta stock por delta cacheado,
+  no escribe Movement, así que la fuente de ventas son las órdenes). Agregación con **Polars**.
+- **`POST /api/v1/analytics/import-tier-prices`** (multipart CSV `niu,tier,price`): ETL con Polars que hace
+  upsert en `product_tier_prices`; filas con NIU desconocido se omiten. Devuelve `{created, updated, skipped}`.
+- Añadidos a requirements: `polars>=1.0.0` y `email-validator>=2.0.0`.
+- **35 tests verdes** (3 nuevos: sales-summary agrega completadas, import CSV crea/actualiza/omite, auth required).
+- 🎉 **ROADMAP COMPLETO por mi lado:** Sprint 0 (H1-H7), Sprint 1 (R1-R5), Portal (P1-P6). Codex: R6-R9, C12, P5.
+- **Pendiente menor (opcional, avísame):** persistir "precio congelado" en líneas de pedido; refresh tokens del
+  portal (hoy access 60 min sin refresh); bajar `ACCESS_TOKEN_EXPIRE_MINUTES` interno a 15-30 (R8 ya cablea refresh).
+
 <!-- Codex: escribe aquí tus entradas, añadiendo al final de esta sección. -->
 
 ### 2026-06-02 — R6 cola offline picking + SW versionado

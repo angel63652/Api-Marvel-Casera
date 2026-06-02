@@ -34,6 +34,7 @@ from app.routers import (
     portal,
     customer_requests,
     customers,
+    analytics,
 )
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -143,6 +144,7 @@ app.include_router(portal.router)
 # Office-side customer management + change-request review (employee-gated).
 app.include_router(customers.router, prefix=API_PREFIX, dependencies=auth_dep)
 app.include_router(customer_requests.router, prefix=API_PREFIX, dependencies=auth_dep)
+app.include_router(analytics.router, prefix=API_PREFIX, dependencies=auth_dep)
 
 # ---- Static files & templates ---------------------------------------------
 if os.path.isdir(STATIC_DIR):
