@@ -190,3 +190,11 @@
 - `apiWithMeta()` intenta `POST /employees/refresh` una sola vez ante 401 (excepto login/refresh/logout), guarda el nuevo access y reintenta la peticion original.
 - Verificacion frontend aislada: mock de `fetch/localStorage` confirma refresh+retry y logout+limpieza.
 - Verificacion backend live: servidor temporal 8001, login devuelve refresh, refresh devuelve access, logout revoca y refresh posterior da 401.
+
+### 2026-06-02 — R9 stock reservado/disponible en frontend interno
+- Claim respetado: solo `products.html`, `orders.html` y cierre en tablero/bitacora.
+- Productos muestra stock fisico, reservado y disponible; el estado visual se calcula contra `available_stock`.
+- Ordenes muestra disponibilidad al seleccionar producto, limpia lineas sin coincidencia para evitar `product_id` stale y bloquea cantidades superiores al disponible antes del `POST /orders`.
+- Verificacion: `git diff --check`, parseo de scripts inline con Node empaquetado y mock JS de normalizacion/lookup/bloqueo por stock.
+- Limitacion: smoke visual autenticado no completado porque la BD SQLite local no tiene la columna nueva de R4.
+- [BACKEND] En entorno local `sqlite+aiosqlite:///./wms.db`, `GET /api/v1/products?limit=5&offset=0` devuelve 500: `sqlite3.OperationalError: no such column: products.reserved_stock`. Falta aplicar migracion `c3d4reserv01` o recrear la BD local antes del smoke visual.

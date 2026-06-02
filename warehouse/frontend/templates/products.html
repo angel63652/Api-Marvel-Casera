@@ -43,7 +43,9 @@
             <th class="text-left px-4 py-3 font-semibold text-gray-500 text-xs uppercase tracking-wide">Nombre</th>
             <th class="text-left px-4 py-3 font-semibold text-gray-500 text-xs uppercase tracking-wide hidden md:table-cell">Categoría</th>
             <th class="text-left px-4 py-3 font-semibold text-gray-500 text-xs uppercase tracking-wide hidden lg:table-cell">Unidad</th>
-            <th class="text-right px-4 py-3 font-semibold text-gray-500 text-xs uppercase tracking-wide">Stock</th>
+            <th class="text-right px-4 py-3 font-semibold text-gray-500 text-xs uppercase tracking-wide">Fisico</th>
+            <th class="text-right px-4 py-3 font-semibold text-gray-500 text-xs uppercase tracking-wide hidden md:table-cell">Reservado</th>
+            <th class="text-right px-4 py-3 font-semibold text-gray-500 text-xs uppercase tracking-wide">Disponible</th>
             <th class="text-right px-4 py-3 font-semibold text-gray-500 text-xs uppercase tracking-wide hidden sm:table-cell">Mín</th>
             <th class="text-center px-4 py-3 font-semibold text-gray-500 text-xs uppercase tracking-wide">Estado</th>
             <th class="text-center px-4 py-3 font-semibold text-gray-500 text-xs uppercase tracking-wide">Acciones</th>
@@ -51,7 +53,7 @@
         </thead>
         <tbody class="divide-y divide-gray-100">
           <template x-if="!products.length">
-            <tr><td colspan="9" class="py-12 text-center text-gray-400">
+            <tr><td colspan="11" class="py-12 text-center text-gray-400">
               <svg class="w-12 h-12 mx-auto mb-3 text-gray-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 10V7"/>
               </svg>
@@ -65,11 +67,15 @@
               <td class="px-4 py-3 font-medium text-gray-800" data-label="Nombre" x-text="p.name"></td>
               <td class="px-4 py-3 text-gray-600 hidden md:table-cell" data-label="Categoría" x-text="p.category || '—'"></td>
               <td class="px-4 py-3 text-gray-600 hidden lg:table-cell" data-label="Unidad" x-text="p.unit || '—'"></td>
-              <td class="px-4 py-3 text-right font-semibold" data-label="Stock"
+              <td class="px-4 py-3 text-right font-semibold" data-label="Fisico"
                   :class="p.current_stock <= 0 ? 'text-red-600' : p.current_stock <= p.min_stock ? 'text-amber-600' : 'text-gray-800'"
                   x-text="p.current_stock"></td>
+              <td class="px-4 py-3 text-right text-gray-500 hidden md:table-cell" data-label="Reservado" x-text="p.reserved_stock"></td>
+              <td class="px-4 py-3 text-right font-semibold" data-label="Disponible"
+                  :class="p.available_stock <= 0 ? 'text-red-600' : p.available_stock <= p.min_stock ? 'text-amber-600' : 'text-emerald-700'"
+                  x-text="p.available_stock"></td>
               <td class="px-4 py-3 text-right text-gray-500 hidden sm:table-cell" data-label="Mínimo" x-text="p.min_stock"></td>
-              <td class="px-4 py-3 text-center" data-label="Estado" x-html="stockStatusBadge(p.current_stock, p.min_stock)"></td>
+              <td class="px-4 py-3 text-center" data-label="Estado" x-html="stockStatusBadge(p.available_stock, p.min_stock)"></td>
               <td class="px-4 py-3" data-label="Acciones">
                 <div class="flex items-center justify-center gap-2">
                   <button @click="editProduct(p)" class="p-1.5 text-blue-600 hover:bg-blue-50 rounded transition-colors" title="Editar">
@@ -221,7 +227,15 @@ function productsData() {
     },
 
     normalizeProduct(p) {
-      return { ...p, min_stock: p.min_stock ?? p.minimum_stock ?? 0 };
+      const currentStock = Number(p.current_stock ?? 0);
+      const reservedStock = Number(p.reserved_stock ?? 0);
+      return {
+        ...p,
+        current_stock: currentStock,
+        reserved_stock: reservedStock,
+        available_stock: Number(p.available_stock ?? (currentStock - reservedStock)),
+        min_stock: Number(p.min_stock ?? p.minimum_stock ?? 0),
+      };
     },
 
     productPayload() {

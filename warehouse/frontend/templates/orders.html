@@ -156,10 +156,15 @@
                   <label class="form-label text-xs">Producto (NIU o nombre)</label>
                   <input type="text" class="form-input text-sm" x-model="line.product_niu" placeholder="NIU o nombre" @change="lookupProductLine(line)">
                   <p class="text-xs text-blue-600 mt-0.5" x-text="line.product_name" x-show="line.product_name"></p>
+                  <p class="text-xs text-gray-500 mt-0.5" x-show="line.available_stock !== null">
+                    Disponible: <span x-text="line.available_stock"></span> | Reservado: <span x-text="line.reserved_stock"></span>
+                  </p>
                 </div>
                 <div class="w-24">
                   <label class="form-label text-xs">Cantidad</label>
-                  <input type="number" class="form-input text-sm" x-model.number="line.quantity" min="1" step="1" placeholder="1">
+                  <input type="number" class="form-input text-sm" x-model.number="line.quantity" min="1" :max="line.available_stock !== null ? line.available_stock : null" step="1" placeholder="1"
+                         :class="line.available_stock !== null && line.quantity > line.available_stock ? 'border-red-300 text-red-700 focus:border-red-500 focus:ring-red-500' : ''">
+                  <p class="text-xs text-red-600 mt-0.5" x-show="line.available_stock !== null && line.quantity > line.available_stock">Stock insuficiente</p>
                 </div>
                 <div class="w-28">
                   <label class="form-label text-xs">Precio unit.</label>
@@ -247,10 +252,26 @@ function ordersData() {
     },
     closeModal() { this.showModal = false; },
 
-    addOrderLine() { this.form.lines.push({ product_niu: '', product_name: '', quantity: 1, unit_price: 0 }); },
+    addOrderLine() {
+      this.form.lines.push({
+        product_niu: '',
+        product_name: '',
+        quantity: 1,
+        unit_price: 0,
+        product_id: null,
+        current_stock: 0,
+        reserved_stock: 0,
+        available_stock: null,
+      });
+    },
     removeOrderLine(idx) { this.form.lines.splice(idx, 1); },
 
     async lookupProductLine(line) {
+      line.product_id = null;
+      line.product_name = '';
+      line.current_stock = 0;
+      line.reserved_stock = 0;
+      line.available_stock = null;
       if (!line.product_niu) return;
       const q = encodeURIComponent(line.product_niu);
       try {
@@ -264,6 +285,9 @@ function ordersData() {
         if (prod) {
           line.product_id = prod.id;
           line.product_name = prod.name;
+          line.current_stock = Number(prod.current_stock ?? 0);
+          line.reserved_stock = Number(prod.reserved_stock ?? 0);
+          line.available_stock = Number(prod.available_stock ?? prod.current_stock ?? 0);
           if (!line.unit_price) line.unit_price = prod.price_cost || 0;
         }
       } catch (_) {}
@@ -290,6 +314,13 @@ function ordersData() {
         const payload = this.orderPayload();
         if (!payload.lines.length) {
           toast('Selecciona al menos un producto existente por NIU o codigo de barras', 'warning');
+          return;
+        }
+        const unavailable = this.form.lines.find(line =>
+          line.product_id && line.available_stock !== null && line.quantity > line.available_stock
+        );
+        if (unavailable) {
+          toast(`Stock disponible insuficiente para ${unavailable.product_name || unavailable.product_niu}`, 'warning');
           return;
         }
         await api('POST', '/orders', payload);

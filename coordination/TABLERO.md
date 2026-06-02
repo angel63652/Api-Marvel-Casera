@@ -34,7 +34,7 @@ Ver detalle en `AUDITORIA.md` Â§2-Â§3 y Â§8.
 | R5 | PaginaciÃ³n en listados largos | backend | **Claude** | âœ… HECHO (2026-06-02) | `limit`/`offset` acotados + cabecera `X-Total-Count` en products/orders/movements/locations |
 | R6 | Cola offline picking a IndexedDB + cachÃ© SW versionado | frontend | **Codex** | HECHO (2026-06-02) | IndexedDB + migraciÃ³n desde `localStorage`; SW `2026-06-02-r6` |
 | R7 | Corregir cableado frontend restante fuera de C2 | frontend | **Codex** | HECHO (2026-06-02) | Movimientos usa `/products?search`, `ENTRY/EXIT` y payload real; reposiciones usa estados API y `received_qty` |
-| R9 | Mostrar stock reservado/disponible en frontend interno | frontend | **Codex** | EN CURSO (2026-06-02) | `products.html`, `orders.html`, `app.js` si hace falta |
+| R9 | Mostrar stock reservado/disponible en frontend interno | frontend | **Codex** | HECHO (2026-06-02) | `products.html` muestra fisico/reservado/disponible; `orders.html` valida cantidad contra `available_stock` |
 
 ## ðŸŸ¢ Roadmap interno pendiente (de ESTADO_PROYECTO.md)
 
