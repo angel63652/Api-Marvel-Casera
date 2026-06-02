@@ -55,7 +55,7 @@ Ver detalle en `AUDITORIA.md` Â§2-Â§3 y Â§8.
 | P2 | Auth realm de cliente (JWT `aud=portal`, tenancy) | backend | **Claude** | ✅ HECHO (2026-06-02) | `/api/portal/auth/{register,login,me}`; token `aud=portal type=customer`; cross-realm rechazado; rate-limit; 6 tests (23 total) |
 | P3 | API portal (catálogo, carrito/reserva, pedidos, perfil) | backend | **Claude** | ✅ HECHO (2026-06-02) | pricing por tarifa + catálogo + pedido sin sobreventa (`reserve_if_available`) + perfil/direcciones + change-requests + admin clientes (oficina); migración `e5f6pricing1`; 28 tests. **Contrato P5 en BITACORA** |
 | P4 | Tiempo real stock (Redis pub/sub o LISTEN/NOTIFY → SSE) | backend | — | LIBRE | |
-| P5 | PWA portal cliente (separada de la interna) | frontend | — | LIBRE | contra contrato de P3 |
+| P5 | PWA portal cliente (separada de la interna) | frontend | **Codex** | EN CURSO (2026-06-02) | `portal.html`, `portal.js`, `portal-sw.js`, `portal-manifest.json`; frontera `main.py` solo para servir `/portal` |
 | P6 | Analítica con Polars (informes, ETL tarifas) | backend | — | LIBRE | fuera del camino del pedido |
 
 ---
