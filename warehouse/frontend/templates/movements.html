@@ -195,7 +195,7 @@ function movementsData() {
     loading: true, submitting: false, showModal: false,
     movements: [], tab: 'all',
     search: '', dateFrom: '', dateTo: '',
-    currentPage: 1, totalPages: 1, totalCount: 0,
+    currentPage: 1, totalPages: 1, totalCount: 0, pageSize: 20, lastFilterKey: '',
     modalType: 'entrada', scanInput: '',
     form: { reference: '', date: '', notes: '', lines: [] },
 
@@ -211,15 +211,24 @@ function movementsData() {
     async fetchMovements() {
       this.loading = true;
       try {
-        const params = new URLSearchParams();
+        const filterKey = [this.tab, this.search, this.dateFrom, this.dateTo].join('|');
+        if (filterKey !== this.lastFilterKey) {
+          this.currentPage = 1;
+          this.lastFilterKey = filterKey;
+        }
+        const hasClientSearch = Boolean(this.search.trim());
+        const params = new URLSearchParams({
+          limit: hasClientSearch ? 500 : this.pageSize,
+          offset: hasClientSearch ? 0 : (this.currentPage - 1) * this.pageSize,
+        });
         if (this.tab !== 'all') params.set('type', this.apiMovementType(this.tab));
         if (this.dateFrom) params.set('start_date', `${this.dateFrom}T00:00:00`);
         if (this.dateTo) params.set('end_date', `${this.dateTo}T23:59:59`);
-        const data = await api('GET', `/movements?${params}`);
-        const rows = (data.items || data || []).flatMap(mov => this.normalizeMovementRows(mov));
+        const { data, totalCount } = await apiWithMeta('GET', `/movements?${params}`);
+        const rows = (data?.items || data || []).flatMap(mov => this.normalizeMovementRows(mov));
         this.movements = this.filterMovementRows(rows);
-        this.totalPages = data.total_pages || 1;
-        this.totalCount = data.total || this.movements.length;
+        this.totalCount = hasClientSearch ? this.movements.length : (totalCount ?? this.movements.length);
+        this.totalPages = hasClientSearch ? 1 : Math.max(1, Math.ceil(this.totalCount / this.pageSize));
       } catch (_) {} finally { this.loading = false; }
     },
 

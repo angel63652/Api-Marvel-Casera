@@ -130,3 +130,11 @@
 - Movimientos deja de usar `/products/lookup`, filtra en cliente y envia `ENTRY`/`EXIT` con `lines[].product_id`.
 - Reposiciones usa estados API (`PENDING`, `IN_PROGRESS`, `COMPLETED`) y marca recibido con `received_qty` en query string.
 - Verificacion: smoke navegador en `/movements` y `/replenishments`, parseo de scripts inline y endpoints API 200 con JWT.
+
+### 2026-06-02 — C12 paginacion frontend
+- Claim respetado: frontend compartido (`app.js`) y listados `products`, `orders`, `movements`, `locations`.
+- `apiWithMeta()` expone `X-Total-Count` sin romper `api()`. Productos, ordenes, movimientos y ubicaciones usan `limit`/`offset`.
+- Ubicaciones deriva pasillos desde `/locations?limit=1000` (la ruta `/locations/aisles` no existe) y normaliza `capacity/current_load`.
+- Verificacion: parseo de JS/templates OK; tras instalar `slowapi` en `.venv`, servidor temporal en 8001 devuelve 200 + `X-Total-Count` en los cuatro endpoints; login R2 trae `refresh_token`.
+- Limitacion: el navegador embebido no permitio `fill`/`localStorage` por clipboard virtual; Playwright runtime local no tenia `playwright-core`, asi que no se completo smoke visual autenticado en 8001.
+- [BACKEND] `locations.html` mantiene boton de eliminar que llama `DELETE /locations/{id}`, pero `routers/locations.py` no expone esa ruta.

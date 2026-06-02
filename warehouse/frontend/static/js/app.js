@@ -8,6 +8,11 @@
    API Helper
    ============================================================ */
 async function api(method, path, body = null) {
+  const result = await apiWithMeta(method, path, body);
+  return result?.data;
+}
+
+async function apiWithMeta(method, path, body = null) {
   const token = localStorage.getItem('wms_token');
   const headers = { 'Content-Type': 'application/json', 'Accept': 'application/json' };
   if (token) headers.Authorization = `Bearer ${token}`;
@@ -25,7 +30,7 @@ async function api(method, path, body = null) {
     if (res.status === 401) {
       clearSession();
       window.location.replace('/login');
-      return;
+      return { data: null, totalCount: null };
     }
 
     const contentType = res.headers.get('Content-Type') || '';
@@ -46,8 +51,12 @@ async function api(method, path, body = null) {
       throw new Error(errMsg);
     }
 
-    if (res.status === 204 || !isJson) return null;
-    return await res.json();
+    const totalHeader = res.headers.get('X-Total-Count');
+    const parsedTotal = totalHeader === null ? null : Number(totalHeader);
+    const totalCount = Number.isFinite(parsedTotal) ? parsedTotal : null;
+
+    if (res.status === 204 || !isJson) return { data: null, totalCount };
+    return { data: await res.json(), totalCount };
   } catch (err) {
     if (err.name === 'TypeError' && err.message.includes('fetch')) {
       toast('Sin conexión con el servidor', 'error');
