@@ -32,7 +32,7 @@ Ver detalle en `AUDITORIA.md` §2-§3 y §8.
 | R4 | Modelo de **reservas de stock** (`available = físico − reservado`) | backend | — | LIBRE | nuevo `models/`, prerrequisito portal |
 | R5 | Paginación en listados largos | backend | **Claude** | ✅ HECHO (2026-06-02) | `limit`/`offset` acotados + cabecera `X-Total-Count` en products/orders/movements/locations |
 | R6 | Cola offline picking a IndexedDB + caché SW versionado | frontend | **Codex** | HECHO (2026-06-02) | IndexedDB + migración desde `localStorage`; SW `2026-06-02-r6` |
-| R7 | Corregir cableado frontend restante fuera de C2 | frontend | **Codex** | EN CURSO (2026-06-02) | `warehouse/frontend/templates/movements.html`, `warehouse/frontend/templates/replenishments.html` |
+| R7 | Corregir cableado frontend restante fuera de C2 | frontend | **Codex** | HECHO (2026-06-02) | Movimientos usa `/products?search`, `ENTRY/EXIT` y payload real; reposiciones usa estados API y `received_qty` |
 
 ## 🟢 Roadmap interno pendiente (de ESTADO_PROYECTO.md)
 

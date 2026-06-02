@@ -55,7 +55,7 @@
           <template x-if="!movements.length">
             <tr><td colspan="7" class="py-12 text-center text-gray-400">No se encontraron movimientos</td></tr>
           </template>
-          <template x-for="mov in movements" :key="mov.id">
+          <template x-for="mov in movements" :key="mov.row_id">
             <tr class="hover:bg-gray-50">
               <td class="px-4 py-3 text-xs text-gray-500" data-label="Fecha" x-text="formatDateTime(mov.created_at)"></td>
               <td class="px-4 py-3" data-label="Tipo">
@@ -211,16 +211,51 @@ function movementsData() {
     async fetchMovements() {
       this.loading = true;
       try {
-        const params = new URLSearchParams({ page: this.currentPage, page_size: 20 });
-        if (this.tab !== 'all') params.set('type', this.tab);
-        if (this.search) params.set('search', this.search);
-        if (this.dateFrom) params.set('date_from', this.dateFrom);
-        if (this.dateTo) params.set('date_to', this.dateTo);
+        const params = new URLSearchParams();
+        if (this.tab !== 'all') params.set('type', this.apiMovementType(this.tab));
+        if (this.dateFrom) params.set('start_date', `${this.dateFrom}T00:00:00`);
+        if (this.dateTo) params.set('end_date', `${this.dateTo}T23:59:59`);
         const data = await api('GET', `/movements?${params}`);
-        this.movements = data.items || data || [];
+        const rows = (data.items || data || []).flatMap(mov => this.normalizeMovementRows(mov));
+        this.movements = this.filterMovementRows(rows);
         this.totalPages = data.total_pages || 1;
         this.totalCount = data.total || this.movements.length;
       } catch (_) {} finally { this.loading = false; }
+    },
+
+    apiMovementType(type) {
+      return type === 'entrada' ? 'ENTRY' : 'EXIT';
+    },
+
+    uiMovementType(type) {
+      const inbound = ['ENTRY', 'REPLENISHMENT', 'RETURN'];
+      return inbound.includes(String(type || '').toUpperCase()) ? 'entrada' : 'salida';
+    },
+
+    normalizeMovementRows(movement) {
+      const lines = movement.lines?.length ? movement.lines : [{}];
+      return lines.map((line, index) => ({
+        row_id: `${movement.id}-${line.id || index}`,
+        id: movement.id,
+        created_at: movement.date || movement.created_at,
+        movement_type: this.uiMovementType(movement.type || movement.movement_type),
+        reference: movement.reference,
+        product_name: line.product_name || movement.product_name || 'Producto sin nombre',
+        product_niu: line.product_niu || line.product_barcode || movement.product_niu || '',
+        quantity: line.quantity ?? movement.quantity ?? 0,
+        unit: line.unit || movement.unit || '',
+        location_code: line.location_code || movement.location_code || '',
+        user_name: movement.user_name || movement.user || '',
+      }));
+    },
+
+    filterMovementRows(rows) {
+      const term = this.search.trim().toLowerCase();
+      if (!term) return rows;
+      return rows.filter(row =>
+        [row.product_name, row.product_niu, row.reference, row.location_code]
+          .some(value => String(value || '').toLowerCase().includes(term))
+      );
     },
 
     openModal(type) {
@@ -236,35 +271,71 @@ function movementsData() {
       const code = this.scanInput.trim();
       if (!code) return;
       try {
-        const prod = await api('GET', `/products/lookup?q=${encodeURIComponent(code)}`);
+        const prod = await this.findProduct(code);
         if (prod) {
-          this.form.lines.push({ product_niu: prod.niu, product_name: prod.name, quantity: 1, location_code: prod.default_location || '' });
+          this.form.lines.push(this.newLineFromProduct(prod));
           toast(`Añadido: ${prod.name}`, 'success', 2000);
         } else {
-          this.form.lines.push({ product_niu: code, product_name: '(no encontrado)', quantity: 1, location_code: '' });
+          this.form.lines.push({ product_id: null, product_niu: code, product_name: '(no encontrado)', quantity: 1, location_code: '' });
         }
       } catch (_) {
-        this.form.lines.push({ product_niu: code, product_name: '', quantity: 1, location_code: '' });
+        this.form.lines.push({ product_id: null, product_niu: code, product_name: '', quantity: 1, location_code: '' });
       }
       this.scanInput = '';
     },
 
-    addEmptyLine() { this.form.lines.push({ product_niu: '', product_name: '', quantity: 1, location_code: '' }); },
+    addEmptyLine() { this.form.lines.push({ product_id: null, product_niu: '', product_name: '', quantity: 1, location_code: '' }); },
     removeLine(idx) { this.form.lines.splice(idx, 1); },
 
     async lookupProduct(line) {
       if (!line.product_niu) return;
       try {
-        const prod = await api('GET', `/products/lookup?q=${encodeURIComponent(line.product_niu)}`);
-        if (prod) { line.product_name = prod.name; if (!line.location_code) line.location_code = prod.default_location || ''; }
+        const prod = await this.findProduct(line.product_niu);
+        if (prod) Object.assign(line, this.newLineFromProduct(prod, line.quantity, line.location_code));
       } catch (_) {}
+    },
+
+    async findProduct(query) {
+      const products = await api('GET', `/products?search=${encodeURIComponent(query)}`);
+      const normalized = String(query || '').trim().toLowerCase();
+      return (products || []).find(prod =>
+        String(prod.niu || '').toLowerCase() === normalized ||
+        String(prod.barcode || '').toLowerCase() === normalized
+      ) || products?.[0] || null;
+    },
+
+    newLineFromProduct(product, quantity = 1, locationCode = '') {
+      return {
+        product_id: product.id,
+        product_niu: product.niu || product.barcode || '',
+        product_name: product.name,
+        quantity,
+        location_code: locationCode,
+      };
     },
 
     async saveMovement() {
       if (this.submitting || !this.form.lines.length) return;
       this.submitting = true;
       try {
-        const body = { movement_type: this.modalType, reference: this.form.reference, date: this.form.date, notes: this.form.notes, lines: this.form.lines };
+        const lines = this.form.lines
+          .filter(line => Number(line.quantity) > 0)
+          .map(line => ({
+            product_id: line.product_id,
+            location_id: null,
+            quantity: Number(line.quantity),
+          }));
+        if (!lines.length || lines.some(line => !line.product_id)) {
+          toast('Selecciona productos validos antes de registrar el movimiento', 'warning');
+          return;
+        }
+        const body = {
+          type: this.apiMovementType(this.modalType),
+          reference: this.form.reference || null,
+          date: this.form.date ? new Date(this.form.date).toISOString() : null,
+          notes: this.form.notes || null,
+          lines,
+        };
         await api('POST', '/movements', body);
         toast('Movimiento registrado', 'success');
         this.closeModal(); await this.fetchMovements();

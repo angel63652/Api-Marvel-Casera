@@ -79,3 +79,9 @@
 - La cola offline de picking pasa a IndexedDB (`wms-picking-offline`) y migra automaticamente la cola legacy `wms_picking_queue` desde `localStorage`.
 - El service worker queda versionado como `2026-06-02-r6`, limpia caches `wms-*` antiguas y cachea assets locales + CDN con timeout para no bloquear install.
 - Verificacion: `node --check` en ambos JS, smoke Playwright de IndexedDB y smoke Playwright de registro SW/cache versionada.
+
+### 2026-06-02 — R7 cableado frontend restante
+- Claim respetado: solo `movements.html` y `replenishments.html`, mas cierre en tablero/bitacora.
+- Movimientos deja de usar `/products/lookup`, filtra en cliente y envia `ENTRY`/`EXIT` con `lines[].product_id`.
+- Reposiciones usa estados API (`PENDING`, `IN_PROGRESS`, `COMPLETED`) y marca recibido con `received_qty` en query string.
+- Verificacion: smoke navegador en `/movements` y `/replenishments`, parseo de scripts inline y endpoints API 200 con JWT.

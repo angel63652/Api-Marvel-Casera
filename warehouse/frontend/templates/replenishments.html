@@ -29,9 +29,9 @@
 
     <select class="form-input w-auto" x-model="filterStatus" @change="fetchReplenishments()">
       <option value="">Todos los estados</option>
-      <option value="pending">Pendiente</option>
-      <option value="in_progress">En progreso</option>
-      <option value="completed">Completado</option>
+      <option value="PENDING">Pendiente</option>
+      <option value="IN_PROGRESS">En progreso</option>
+      <option value="COMPLETED">Completado</option>
     </select>
 
     <div class="ml-auto text-sm text-gray-500">
@@ -162,16 +162,51 @@ function replenishmentsData() {
       try {
         const params = new URLSearchParams();
         if (this.filterStatus) params.set('status', this.filterStatus);
+        if (this.filterPriority) params.set('priority', this.filterPriority);
         const data = await api('GET', `/replenishments?${params}`);
-        this.replenishments = data.items || data || [];
+        this.replenishments = (data.items || data || []).map(rep => this.normalizeReplenishment(rep));
       } catch (_) {} finally { this.loading = false; }
+    },
+
+    normalizeReplenishment(rep) {
+      return {
+        ...rep,
+        lines: (rep.lines || []).map(line => {
+          const requested = Number(line.requested_qty ?? line.quantity_to_order ?? 0);
+          const received = Number(line.received_qty ?? line.quantity_received ?? 0);
+          return {
+            ...line,
+            product_niu: line.product_niu || line.product_barcode || '',
+            current_stock: Number(line.current_qty ?? line.current_stock ?? 0),
+            minimum_stock: Number(line.min_qty ?? line.minimum_stock ?? 0),
+            quantity_to_order: requested,
+            quantity_received: received,
+            _received: received || requested,
+            status: this.lineStatus(received, requested),
+          };
+        }),
+      };
+    },
+
+    lineStatus(received, requested) {
+      if (requested > 0 && received >= requested) return 'received';
+      if (received > 0) return 'partial';
+      return 'pending';
+    },
+
+    replaceReplenishment(updated) {
+      const normalized = this.normalizeReplenishment(updated);
+      const index = this.replenishments.findIndex(rep => rep.id === normalized.id);
+      if (index === -1) this.replenishments.unshift(normalized);
+      else this.replenishments.splice(index, 1, normalized);
+      return normalized;
     },
 
     async autoGenerate() {
       this.autoGenerating = true;
       try {
         const result = await api('POST', '/replenishments/auto-generate');
-        const count = result?.created || (Array.isArray(result) ? result.length : 0);
+        const count = result?.created || (Array.isArray(result) ? result.length : (result?.id ? 1 : 0));
         toast(`${count} reposición(es) generada(s) automáticamente`, 'success');
         await this.fetchReplenishments();
       } catch (_) {} finally { this.autoGenerating = false; }
@@ -186,8 +221,8 @@ function replenishmentsData() {
     async markLineReceived(repId, line) {
       const qty = line._received ?? line.quantity_to_order;
       try {
-        await api('POST', `/replenishments/${repId}/lines/${line.id}/receive`, { quantity_received: qty });
-        line.status = 'received'; line.quantity_received = qty;
+        const updated = await api('POST', `/replenishments/${repId}/lines/${line.id}/receive?received_qty=${encodeURIComponent(qty)}`);
+        this.replaceReplenishment(updated);
         toast('Línea marcada como recibida', 'success');
         this.checkReplenishmentComplete(repId);
       } catch (_) {}
@@ -198,8 +233,8 @@ function replenishmentsData() {
         if (line.status !== 'received') {
           const qty = line._received ?? line.quantity_to_order;
           try {
-            await api('POST', `/replenishments/${rep.id}/lines/${line.id}/receive`, { quantity_received: qty });
-            line.status = 'received'; line.quantity_received = qty;
+            const updated = await api('POST', `/replenishments/${rep.id}/lines/${line.id}/receive?received_qty=${encodeURIComponent(qty)}`);
+            rep = this.replaceReplenishment(updated);
           } catch (_) {}
         }
       }
@@ -210,7 +245,7 @@ function replenishmentsData() {
     checkReplenishmentComplete(repId) {
       const rep = this.replenishments.find(r => r.id === repId);
       if (rep && rep.lines && rep.lines.every(l => l.status === 'received')) {
-        rep.status = 'completed';
+        rep.status = 'COMPLETED';
       }
     },
 
