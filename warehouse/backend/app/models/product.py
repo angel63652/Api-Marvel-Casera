@@ -1,6 +1,6 @@
 from sqlalchemy import (
     Column, Integer, String, Float, Numeric, Boolean, DateTime, Text, ForeignKey,
-    Enum as SAEnum,
+    UniqueConstraint, Enum as SAEnum,
 )
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -33,7 +33,8 @@ class Product(Base):
     weight = Column(Float, nullable=True)
     # Money stored as exact NUMERIC(12,2); asdecimal=False keeps Python-side float
     # so existing float arithmetic (summaries, payroll) is unaffected.
-    price_cost = Column(Numeric(12, 2, asdecimal=False), nullable=True)
+    price_cost = Column(Numeric(12, 2, asdecimal=False), nullable=True)  # purchase cost
+    price_base = Column(Numeric(12, 2, asdecimal=False), nullable=True)  # default sale price
     active = Column(Boolean, nullable=False, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(
@@ -65,3 +66,26 @@ class Product(Base):
         back_populates="product",
         lazy="selectin",
     )
+    tier_prices = relationship(
+        "ProductTierPrice",
+        back_populates="product",
+        cascade="all, delete-orphan",
+        lazy="selectin",
+    )
+
+
+class ProductTierPrice(Base):
+    """Per price-tier sale price override for a product (price list)."""
+    __tablename__ = "product_tier_prices"
+    __table_args__ = (
+        UniqueConstraint("product_id", "tier", name="uq_product_tier"),
+    )
+
+    id = Column(Integer, primary_key=True, autoincrement=True, index=True)
+    product_id = Column(
+        Integer, ForeignKey("products.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    tier = Column(String(50), nullable=False, index=True)
+    price = Column(Numeric(12, 2, asdecimal=False), nullable=False)
+
+    product = relationship("Product", back_populates="tier_prices", lazy="selectin")

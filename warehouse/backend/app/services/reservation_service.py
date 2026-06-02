@@ -50,6 +50,45 @@ async def reserve(
     return res
 
 
+async def reserve_if_available(
+    db: AsyncSession,
+    product_id: int,
+    quantity: float,
+    *,
+    order_id: int | None = None,
+    source: str = "PORTAL",
+    expires_at: datetime | None = None,
+) -> StockReservation | None:
+    """Atomically reserve only if available >= quantity (no overselling).
+
+    Returns the reservation, or None if there is not enough available stock.
+    The conditional UPDATE is the gate, so concurrent reservations cannot
+    oversell (unlike `reserve`, which is unconditional / allows backorder).
+    """
+    available = func.coalesce(Product.current_stock, 0.0) - func.coalesce(
+        Product.reserved_stock, 0.0
+    )
+    result = await db.execute(
+        update(Product)
+        .where(Product.id == product_id, available >= quantity)
+        .values(reserved_stock=func.coalesce(Product.reserved_stock, 0.0) + quantity)
+        .execution_options(synchronize_session=False)
+    )
+    if result.rowcount == 0:
+        return None
+    res = StockReservation(
+        product_id=product_id,
+        order_id=order_id,
+        quantity=quantity,
+        status=ReservationStatus.ACTIVE,
+        source=source,
+        expires_at=expires_at,
+    )
+    db.add(res)
+    await db.flush()
+    return res
+
+
 async def _close_active(
     db: AsyncSession, reservations, new_status: ReservationStatus
 ) -> float:

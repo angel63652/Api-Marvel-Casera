@@ -14,6 +14,7 @@ class ProductBase(BaseModel):
     min_stock: float = Field(default=0.0, ge=0)
     weight: Optional[float] = Field(default=None, ge=0)
     price_cost: Optional[float] = Field(default=None, ge=0)
+    price_base: Optional[float] = Field(default=None, ge=0, description="Default sale price")
     active: bool = True
 
 
@@ -29,6 +30,7 @@ class ProductUpdate(BaseModel):
     min_stock: Optional[float] = Field(default=None, ge=0)
     weight: Optional[float] = Field(default=None, ge=0)
     price_cost: Optional[float] = Field(default=None, ge=0)
+    price_base: Optional[float] = Field(default=None, ge=0)
     active: Optional[bool] = None
     barcode: Optional[str] = Field(default=None, max_length=100)
 

@@ -162,6 +162,39 @@
   + TTL, crear pedido → genera `Order` interna, perfil/direcciones, change-requests). **Publicaré el contrato aquí**
   para que arranques P5 (PWA cliente) en paralelo. Aún NO empieces P5.
 
+### 2026-06-02 — P3 API del portal (HECHO) — contrato para P5
+- **Pricing por tarifa (opción B del usuario):** `Product.price_base` (precio venta) + tabla
+  `product_tier_prices` (precio por `tier`). Resolución: tarifa del cliente → si no, base. Migración `e5f6pricing1`.
+  Oficina fija tarifas con `PUT /api/v1/products/{id}/tier-prices?tier=&price=`.
+- **Pedido sin sobreventa:** `reservation_service.reserve_if_available` (UPDATE atómico `WHERE available>=qty`).
+  El pedido del portal crea una `Order` interna (customer_id=`CUST-{id}`) y reserva con `order_id` → el flujo
+  interno de confirmar/cancelar ya consume/libera esas reservas (R4).
+- **Gestión de clientes (oficina):** registro queda PENDING; oficina activa con `POST /api/v1/customers/{id}/approve?price_tier=`.
+- **28 tests verdes** (5 nuevos: catálogo+precio tarifa, pedido+bloqueo sobreventa, PENDING no pide, tenancy, change-request+aprobación).
+
+#### 📜 CONTRATO PARA CODEX → tarea **P5 (PWA cliente)** — YA PUEDES EMPEZAR
+PWA **separada** de la interna (otro realm de auth, `localStorage` keys propias p.ej. `portal_token`).
+Todos los endpoints devuelven JSON; el token va en `Authorization: Bearer <token>`.
+- **Auth** (sin token):
+  - `POST /api/portal/auth/register` body `{company_name, tax_id, email, password, name?, phone?}` → `{access_token, user, customer}` (customer.status=PENDING).
+  - `POST /api/portal/auth/login` body `{email, password}` → `{access_token, user, customer}`.
+  - `GET /api/portal/auth/me` (con token) → `{access_token, user, customer}`.
+- **Catálogo/pedidos (con token de portal):**
+  - `GET /api/portal/catalog?search=&limit=&offset=` → `[{id, niu, barcode, name, category, unit, available_stock, price}]` (+ header `X-Total-Count`).
+  - `POST /api/portal/orders` body `{items:[{product_id, quantity}], shipping_address_id?, notes?}` → `201` `{id, order_number, status, lines, total}`. Errores: **409** stock insuficiente (mensaje con disponible), **403** si cuenta no ACTIVE.
+  - `GET /api/portal/orders` y `GET /api/portal/orders/{id}` → pedidos del propio cliente (404 si no es suyo).
+- **Perfil:**
+  - `GET /api/portal/profile` → `{customer, contact_email, contact_phone, price_tier, addresses[]}`.
+  - `GET /api/portal/addresses` → `[AddressResponse]`.
+  - `POST /api/portal/profile/change-request` body `{target:"FISCAL"|"ADDRESS", payload:{...}}` → `201` (queda PENDING hasta que oficina apruebe).
+  - `GET /api/portal/profile/change-requests` → historial de solicitudes del cliente.
+- **Notas:** mientras la cuenta esté PENDING, el catálogo se puede ver pero **no se puede pedir** (403). El access token
+  del portal caduca en `ACCESS_TOKEN_EXPIRE_MINUTES` (60); el portal aún **no tiene refresh** (mejora futura) → en 401, re-login.
+- ⚠️ **Realms separados:** un token de portal NO sirve en `/api/v1/*` y un token de empleado NO sirve en `/api/portal/*`.
+
+- **Siguiente (yo):** P4 (tiempo real de stock vía SSE) o P6 (Polars). Pendiente tuyo: P5. Pendiente menor: precio del pedido
+  NO se persiste (se recalcula con la tarifa actual) — si quieres “precio congelado” lo añadimos como columna en OrderLine.
+
 <!-- Codex: escribe aquí tus entradas, añadiendo al final de esta sección. -->
 
 ### 2026-06-02 — R6 cola offline picking + SW versionado

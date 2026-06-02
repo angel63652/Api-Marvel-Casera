@@ -1,4 +1,4 @@
-from app.models.product import Product, UnitType
+from app.models.product import Product, UnitType, ProductTierPrice
 from app.models.location import Location, ProductLocation
 from app.models.movement import Movement, MovementLine, MovementType
 from app.models.replenishment import Replenishment, ReplenishmentLine, ReplenishmentStatus, ReplenishmentPriority
@@ -15,6 +15,7 @@ from app.models.customer import (
 )
 
 __all__ = [
+    "ProductTierPrice",
     "RefreshToken",
     "StockReservation", "ReservationStatus",
     "Customer", "CustomerUser", "CustomerAddress", "CustomerChangeRequest",

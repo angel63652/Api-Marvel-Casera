@@ -33,6 +33,7 @@ def _serialize(product: Product) -> dict:
         "available_stock": (product.current_stock or 0.0) - (product.reserved_stock or 0.0),
         "weight": product.weight,
         "price_cost": product.price_cost,
+        "price_base": product.price_base,
         "active": product.active,
         "created_at": product.created_at,
         "updated_at": product.updated_at,
@@ -151,6 +152,36 @@ async def update_product(
     await db.flush()
     await db.refresh(product)
     return ProductResponse.model_validate(_serialize(product))
+
+
+@router.put("/{product_id}/tier-prices", status_code=200)
+async def set_tier_price(
+    product_id: int,
+    tier: str = Query(..., min_length=1, max_length=50),
+    price: float = Query(..., ge=0),
+    db: AsyncSession = Depends(get_db),
+    _: Employee = Depends(require_role("MANAGER", "OFFICE")),
+):
+    """Set (upsert) the sale price of a product for a given price tier."""
+    from app.models.product import ProductTierPrice
+
+    product = await db.get(Product, product_id)
+    if product is None:
+        raise HTTPException(status_code=404, detail="Producto no encontrado")
+    existing = await db.execute(
+        select(ProductTierPrice).where(
+            ProductTierPrice.product_id == product_id,
+            ProductTierPrice.tier == tier,
+        )
+    )
+    tp = existing.scalar_one_or_none()
+    if tp is None:
+        tp = ProductTierPrice(product_id=product_id, tier=tier, price=price)
+        db.add(tp)
+    else:
+        tp.price = price
+    await db.flush()
+    return {"product_id": product_id, "tier": tier, "price": price}
 
 
 @router.delete("/{product_id}", status_code=200)
