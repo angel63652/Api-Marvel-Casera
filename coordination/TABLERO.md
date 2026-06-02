@@ -14,13 +14,13 @@ Ver detalle en `AUDITORIA.md` §2-§3 y §8.
 
 | ID | Tarea | Área | Dueño | Estado | Archivos / notas |
 |----|-------|------|-------|--------|------------------|
-| H1 | Sacar secretos del código (SECRET_KEY/DATABASE_URL sin default; `DEBUG=False`) | backend/infra | — | LIBRE | `config.py`, `docker-compose.yml`, `.env.example` |
-| H2 | CORS whitelist (quitar `allow_origins=["*"]` + credentials) | backend | — | LIBRE | `main.py` |
-| H3 | Autenticar GET sensibles (dashboard, products, orders, movements, emails) | backend | — | LIBRE | `routers/*.py` |
-| H4 | Admin bootstrap por env + forzar cambio de password | backend | — | LIBRE | `main.py` |
-| H5 | Stock atómico (eliminar race en `apply_movement_delta`) | backend | — | LIBRE | `services/stock_service.py` |
-| H6 | Nº de orden por secuencia (quitar `random.randint`) | backend | — | LIBRE | `services/picking_service.py` |
-| H7 | Limpiar CI roto (`.github/fly-deploy.yml` huérfano) + sacar `__pycache__` del repo | infra | — | LIBRE | `.github/`, `.gitignore` |
+| H1 | Sacar secretos del código (SECRET_KEY/DATABASE_URL sin default; `DEBUG=False`) | backend/infra | **Claude** | EN CURSO (2026-06-02) | `config.py`, `docker-compose.yml`, `.env.example` |
+| H2 | CORS whitelist (quitar `allow_origins=["*"]` + credentials) | backend | **Claude** | EN CURSO (2026-06-02) | `main.py` |
+| H3 | Autenticar GET sensibles (dashboard, products, orders, movements, emails) | backend | **Claude** | EN CURSO (2026-06-02) | `routers/*.py` |
+| H4 | Admin bootstrap por env + forzar cambio de password | backend | **Claude** | EN CURSO (2026-06-02) | `main.py` |
+| H5 | Stock atómico (eliminar race en `apply_movement_delta`) | backend | **Claude** | EN CURSO (2026-06-02) | `services/stock_service.py` |
+| H6 | Nº de orden por secuencia (quitar `random.randint`) | backend | **Claude** | EN CURSO (2026-06-02) | `services/picking_service.py` |
+| H7 | Limpiar CI roto (`.github/fly-deploy.yml` huérfano) + sacar `__pycache__` del repo | infra | **Claude** | EN CURSO (2026-06-02) | `.github/`, `.gitignore` |
 
 ## 🟡 Sprint 1 — Robustez
 
