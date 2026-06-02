@@ -52,7 +52,7 @@ Ver detalle en `AUDITORIA.md` Â§2-Â§3 y Â§8.
 | ID | Tarea | Ãrea | DueÃ±o | Estado | Notas |
 |----|-------|------|-------|--------|-------|
 | P1 | Modelos dominio cliente (customer, customer_user, address, change_request) | backend | **Claude** | ✅ HECHO (2026-06-02) | `models/customer.py` (4 modelos + enums) + migración `d4e5customer1`; aislado del dominio empleado; 17 tests sin regresión |
-| P2 | Auth realm de cliente (JWT `aud=portal`, tenancy) | backend | — | LIBRE | depende P1 |
+| P2 | Auth realm de cliente (JWT `aud=portal`, tenancy) | backend | **Claude** | EN CURSO (2026-06-02) | `auth.py` (token cliente + `get_current_customer`), `routers/portal_auth.py`, schemas, `main.py` |
 | P3 | API portal (catálogo, carrito/reserva, pedidos, perfil) | backend | — | LIBRE | publicar contrato primero |
 | P4 | Tiempo real stock (Redis pub/sub o LISTEN/NOTIFY → SSE) | backend | — | LIBRE | |
 | P5 | PWA portal cliente (separada de la interna) | frontend | — | LIBRE | contra contrato de P3 |
