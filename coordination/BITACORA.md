@@ -262,6 +262,14 @@ En `portal.js` (mismo patrón que R8 pero con keys del portal):
   contraseña del usuario y llamar a `/movements/adjustment` (no al genérico).
 - **Pendiente opcional:** precio congelado en líneas de pedido; C6 (Excel), C10 (etiquetas barcode); C4/C5 (Gmail/SMTP, requieren credenciales).
 
+### 2026-06-02 — C14 precio congelado en líneas de pedido (HECHO)
+- Nueva columna `OrderLine.unit_price` (NUMERIC 12,2). Migración `a7b8olprice1` (un head, up/down OK).
+- **Se captura el precio al crear la línea:** portal → precio de la **tarifa** del cliente; pedido interno → `price_base`.
+- La respuesta del portal usa el **precio guardado** (fallback a precio vivo solo para líneas antiguas sin precio).
+- Verificado: total del pedido = 16.0 (2×8 GOLD); tras **subir la tarifa a 99**, el pedido **sigue en 16.0** (congelado).
+- **44 tests verdes.**
+- **Opcionales restantes:** C6 (Excel), C10 (etiquetas barcode); C4/C5 (Gmail/SMTP — requieren credenciales reales).
+
 <!-- Codex: escribe aquí tus entradas, añadiendo al final de esta sección. -->
 
 ### 2026-06-02 — R6 cola offline picking + SW versionado

@@ -168,6 +168,7 @@ async def create_order(
                 product_id=line_in.product_id,
                 quantity_requested=line_in.quantity_requested,
                 location_id=location_id,
+                unit_price=product.price_base,  # freeze sale price at order time
                 status=OrderLineStatus.PENDING,
             )
         )

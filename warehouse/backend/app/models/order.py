@@ -1,5 +1,6 @@
 from sqlalchemy import (
-    Column, Integer, String, Float, Boolean, DateTime, Text, ForeignKey, Enum as SAEnum
+    Column, Integer, String, Float, Numeric, Boolean, DateTime, Text, ForeignKey,
+    Enum as SAEnum,
 )
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -58,6 +59,9 @@ class OrderLine(Base):
     product_id = Column(Integer, ForeignKey("products.id", ondelete="RESTRICT"), nullable=False, index=True)
     quantity_requested = Column(Float, nullable=False)
     quantity_picked = Column(Float, nullable=False, default=0.0)
+    # Sale price captured at order time (frozen) so totals don't shift if the
+    # tariff changes later. Money: NUMERIC(12,2), float in Python.
+    unit_price = Column(Numeric(12, 2, asdecimal=False), nullable=True)
     location_id = Column(Integer, ForeignKey("locations.id", ondelete="SET NULL"), nullable=True)
     status = Column(SAEnum(OrderLineStatus), nullable=False, default=OrderLineStatus.PENDING)
     observations = Column(Text, nullable=True)

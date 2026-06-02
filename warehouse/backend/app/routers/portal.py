@@ -109,7 +109,11 @@ async def _build_order_response(order: Order, tier: str | None, db: AsyncSession
     total = 0.0
     has_price = False
     for line in order.lines:
-        price = await pricing_service.resolve_price(db, line.product_id, tier)
+        # Use the frozen price captured at order time; fall back to live pricing
+        # for legacy lines created before C14.
+        price = line.unit_price
+        if price is None:
+            price = await pricing_service.resolve_price(db, line.product_id, tier)
         line_total = (price * line.quantity_requested) if price is not None else None
         if line_total is not None:
             total += line_total
@@ -187,11 +191,14 @@ async def create_portal_order(
                 detail=f"Stock insuficiente de '{product.name}': disponible {available}, solicitado {item.quantity}",
             )
         location_id = product.locations[0].location_id if product.locations else None
+        # Freeze the sale price at order time (tier price → base).
+        unit_price = pricing_service.resolve_price_from_loaded(product, customer.price_tier)
         db.add(OrderLine(
             order_id=order.id,
             product_id=item.product_id,
             quantity_requested=item.quantity,
             location_id=location_id,
+            unit_price=unit_price,
             status=OrderLineStatus.PENDING,
         ))
     await db.flush()
