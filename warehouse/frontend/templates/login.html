@@ -155,6 +155,8 @@
 
       // Persist auth.
       localStorage.setItem('wms_token', data.access_token);
+      if (data.refresh_token) localStorage.setItem('wms_refresh', data.refresh_token);
+      else localStorage.removeItem('wms_refresh');
       localStorage.setItem('wms_user',  JSON.stringify(data.employee));
 
       // Go to dashboard.

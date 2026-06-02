@@ -7,12 +7,14 @@
 /* ============================================================
    API Helper
    ============================================================ */
+let refreshInFlight = null;
+
 async function api(method, path, body = null) {
   const result = await apiWithMeta(method, path, body);
   return result?.data;
 }
 
-async function apiWithMeta(method, path, body = null) {
+async function apiWithMeta(method, path, body = null, retryingAfterRefresh = false) {
   const token = localStorage.getItem('wms_token');
   const headers = { 'Content-Type': 'application/json', 'Accept': 'application/json' };
   if (token) headers.Authorization = `Bearer ${token}`;
@@ -28,6 +30,9 @@ async function apiWithMeta(method, path, body = null) {
     const res = await fetch(`/api/v1${path}`, opts);
 
     if (res.status === 401) {
+      if (!retryingAfterRefresh && shouldRefreshForPath(path) && await refreshAccessToken()) {
+        return apiWithMeta(method, path, body, true);
+      }
       clearSession();
       window.location.replace('/login');
       return { data: null, totalCount: null };
@@ -65,17 +70,64 @@ async function apiWithMeta(method, path, body = null) {
   }
 }
 
+function shouldRefreshForPath(path) {
+  return !path.startsWith('/employees/login') &&
+    !path.startsWith('/employees/refresh') &&
+    !path.startsWith('/employees/logout');
+}
+
+async function refreshAccessToken() {
+  const refreshToken = localStorage.getItem('wms_refresh');
+  if (!refreshToken) return false;
+
+  if (!refreshInFlight) {
+    refreshInFlight = fetch('/api/v1/employees/refresh', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      credentials: 'same-origin',
+      body: JSON.stringify({ refresh_token: refreshToken }),
+    })
+      .then(async (res) => {
+        if (!res.ok) return false;
+        const data = await res.json().catch(() => ({}));
+        if (!data.access_token) return false;
+        localStorage.setItem('wms_token', data.access_token);
+        return true;
+      })
+      .catch(() => false)
+      .finally(() => { refreshInFlight = null; });
+  }
+
+  return refreshInFlight;
+}
+
 /* ============================================================
    Auth helpers
    ============================================================ */
 function clearSession() {
   localStorage.removeItem('wms_token');
+  localStorage.removeItem('wms_refresh');
   localStorage.removeItem('wms_user');
 }
 
 function logout() {
-  clearSession();
-  window.location.replace('/login');
+  const refreshToken = localStorage.getItem('wms_refresh');
+  const finish = () => {
+    clearSession();
+    window.location.replace('/login');
+  };
+
+  if (!refreshToken) {
+    finish();
+    return;
+  }
+
+  fetch('/api/v1/employees/logout', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+    credentials: 'same-origin',
+    body: JSON.stringify({ refresh_token: refreshToken }),
+  }).finally(finish);
 }
 
 function getCurrentUser() {

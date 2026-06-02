@@ -155,3 +155,10 @@
 - Verificacion: parseo de JS/templates OK; tras instalar `slowapi` en `.venv`, servidor temporal en 8001 devuelve 200 + `X-Total-Count` en los cuatro endpoints; login R2 trae `refresh_token`.
 - Limitacion: el navegador embebido no permitio `fill`/`localStorage` por clipboard virtual; Playwright runtime local no tenia `playwright-core`, asi que no se completo smoke visual autenticado en 8001.
 - [BACKEND] `locations.html` mantiene boton de eliminar que llama `DELETE /locations/{id}`, pero `routers/locations.py` no expone esa ruta.
+
+### 2026-06-02 — R8 auto-refresh frontend
+- Claim respetado: `login.html` y `app.js`.
+- Login guarda `wms_refresh`; `clearSession()` borra access/refresh/user; `logout()` revoca `POST /employees/logout` y luego redirige.
+- `apiWithMeta()` intenta `POST /employees/refresh` una sola vez ante 401 (excepto login/refresh/logout), guarda el nuevo access y reintenta la peticion original.
+- Verificacion frontend aislada: mock de `fetch/localStorage` confirma refresh+retry y logout+limpieza.
+- Verificacion backend live: servidor temporal 8001, login devuelve refresh, refresh devuelve access, logout revoca y refresh posterior da 401.
