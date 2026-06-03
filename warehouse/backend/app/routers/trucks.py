@@ -356,3 +356,17 @@ async def update_truck(
     await db.flush()
     await db.refresh(truck)
     return _truck_resp(truck)
+
+
+@router.delete("/{truck_id}", status_code=200)
+async def deactivate_truck(
+    truck_id: int,
+    db: AsyncSession = Depends(get_db),
+    _: Employee = Depends(require_role("MANAGER")),
+):
+    truck = await db.get(Truck, truck_id)
+    if truck is None:
+        raise HTTPException(status_code=404, detail="Camión no encontrado")
+    truck.is_active = False
+    await db.flush()
+    return {"detail": "Camión desactivado", "id": truck_id}

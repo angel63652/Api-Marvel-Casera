@@ -429,3 +429,19 @@ async def create_payroll(
     await db.flush()
     await db.refresh(payroll)
     return _payroll_resp(payroll)
+
+
+@router.delete("/{employee_id}", status_code=200)
+async def deactivate_employee(
+    employee_id: int,
+    db: AsyncSession = Depends(get_db),
+    current: Employee = Depends(require_role("ADMIN")),
+):
+    employee = await db.get(Employee, employee_id)
+    if employee is None:
+        raise HTTPException(status_code=404, detail="Empleado no encontrado")
+    if employee.id == current.id:
+        raise HTTPException(status_code=400, detail="No puedes desactivar tu propia cuenta")
+    employee.is_active = False
+    await db.flush()
+    return {"detail": "Empleado desactivado", "id": employee_id}
