@@ -452,7 +452,13 @@ function trucksData() {
 
     async exportExcel(){
       try{
-        toast('Exportacion de historial pendiente de endpoint backend', 'info');
+        const params = new URLSearchParams();
+        if (this.historyFrom) params.set('start_date', `${this.historyFrom}T00:00:00`);
+        if (this.historyTo) params.set('end_date', `${this.historyTo}T23:59:59`);
+        const query = params.toString();
+        const suffix = `${this.historyFrom || 'inicio'}_${this.historyTo || 'fin'}`;
+        await downloadFile(`/trucks/schedules/history/export${query ? `?${query}` : ''}`, `historico_camiones_${suffix}.xlsx`);
+        toast('Exportacion iniciada', 'success');
       }catch(_){}
     },
 

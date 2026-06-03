@@ -49,7 +49,7 @@ Ver detalle en `AUDITORIA.md` Â§2-Â§3 y Â§8.
 | C13 | UI analitica y carga de tarifas (consume P6) | frontend | **Codex** | HECHO (2026-06-03) | `dashboard.html`; consume `/analytics/sales-summary` y `/analytics/import-tier-prices` |
 | C14 | Precio congelado en líneas de pedido | backend | **Claude** | ✅ HECHO (2026-06-02) | `OrderLine.unit_price` capturado al crear (portal: tarifa; interno: base); respuesta usa el precio guardado; migración `a7b8olprice1`; 44 tests |
 | C15 | UI ajuste de stock con contrasena (consume C7) | frontend | **Codex** | HECHO (2026-06-03) | `movements.html`; pide password y llama `/movements/adjustment` |
-| C16 | UI export Excel (consume C6) | frontend | **Codex** | EN CURSO (2026-06-03) | botones de export para viajes y nominas con bearer token |
+| C16 | UI export Excel (consume C6) | frontend | **Codex** | HECHO (2026-06-03) | botones de export para productos, ordenes, viajes y nominas; etiqueta PNG por producto |
 
 ## ðŸ”µ Portal Cliente (ver `PROPUESTA_PORTAL_CLIENTE.md`) â€” tras Sprint 0/1
 

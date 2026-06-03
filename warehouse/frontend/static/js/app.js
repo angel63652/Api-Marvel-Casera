@@ -76,6 +76,76 @@ function shouldRefreshForPath(path) {
     !path.startsWith('/employees/logout');
 }
 
+function filenameFromDisposition(disposition) {
+  if (!disposition) return '';
+  const utf8 = disposition.match(/filename\*=UTF-8''([^;]+)/i);
+  if (utf8?.[1]) {
+    try {
+      return decodeURIComponent(utf8[1]);
+    } catch (_) {
+      return utf8[1];
+    }
+  }
+  const standard = disposition.match(/filename="?([^";]+)"?/i);
+  return standard?.[1] || '';
+}
+
+async function downloadFile(path, fallbackFilename = 'descarga', retryingAfterRefresh = false) {
+  const token = localStorage.getItem('wms_token');
+  const headers = { 'Accept': 'application/octet-stream' };
+  if (token) headers.Authorization = `Bearer ${token}`;
+
+  try {
+    const res = await fetch(`/api/v1${path}`, {
+      method: 'GET',
+      headers,
+      credentials: 'same-origin',
+    });
+
+    if (res.status === 401) {
+      if (!retryingAfterRefresh && shouldRefreshForPath(path) && await refreshAccessToken()) {
+        return downloadFile(path, fallbackFilename, true);
+      }
+      clearSession();
+      window.location.replace('/login');
+      return null;
+    }
+
+    if (!res.ok) {
+      let errMsg = `Error ${res.status}: ${res.statusText}`;
+      const contentType = res.headers.get('Content-Type') || '';
+      if (contentType.includes('application/json')) {
+        try {
+          const errData = await res.json();
+          errMsg = errData.detail || errData.message || errData.error || errMsg;
+        } catch (_) {}
+      } else {
+        const text = await res.text().catch(() => '');
+        if (text) errMsg = text.slice(0, 200);
+      }
+      toast(errMsg, 'error');
+      throw new Error(errMsg);
+    }
+
+    const blob = await res.blob();
+    const filename = filenameFromDisposition(res.headers.get('Content-Disposition') || '') || fallbackFilename;
+    const objectUrl = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = objectUrl;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+    return filename;
+  } catch (err) {
+    if (err.name === 'TypeError' && err.message.includes('fetch')) {
+      toast('Sin conexiÃ³n con el servidor', 'error');
+    }
+    throw err;
+  }
+}
+
 async function refreshAccessToken() {
   const refreshToken = localStorage.getItem('wms_refresh');
   if (!refreshToken) return false;

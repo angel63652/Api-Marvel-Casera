@@ -366,3 +366,11 @@ En `portal.js` (mismo patrón que R8 pero con keys del portal):
 - El ajuste llama a `POST /api/v1/movements/adjustment`; entradas/salidas siguen usando `POST /movements`.
 - La tabla representa `ADJUSTMENT` como Ajuste, con badge amber y cantidad firmada.
 - Verificacion: parseo del script inline con Node empaquetado, mock Node del flujo frontend, `pytest tests/test_adjustment.py -q --tb=short` verde y smoke HTTP live: entrada 10, ajuste -3, stock final 7, password incorrecta 401, filtro `type=ADJUSTMENT` OK.
+
+### 2026-06-03 — C16 UI export Excel y etiquetas
+- Claim respetado: frontend compartido (`app.js`) y plantillas `products.html`, `orders.html`, `trucks.html`, `employees.html`.
+- `downloadFile()` centraliza descargas autenticadas con bearer, reintento tras refresh 401, nombre de fichero desde `Content-Disposition` y redirect a `/login` si la sesion ya no es valida.
+- Productos y ordenes incorporan boton "Exportar Excel"; camiones reemplaza el placeholder de historico; nominas exporta el periodo seleccionado.
+- Productos incluye accion por fila para descargar etiqueta PNG desde `/products/{id}/label`.
+- Verificacion: `git diff --check`, `node --check app.js`, parseo de scripts inline, mock Node de descarga+refresh, `pytest tests/test_export.py tests/test_barcodes.py -q --tb=short` verde y smoke HTTP live con XLSX/PNG validos.
+- Limitacion: el runtime del navegador integrado se reinicio consultando logs tras el login; la comprobacion UI se cerro con HTML servido + smoke HTTP autenticado.
