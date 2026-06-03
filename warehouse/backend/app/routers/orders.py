@@ -22,6 +22,8 @@ from app.schemas.order import (
 )
 from app.auth import get_current_employee, require_role
 from app.services import picking_service, stock_service, reservation_service
+from app.services.excel_service import build_xlsx, XLSX_MEDIA, xlsx_headers
+from fastapi.responses import Response as FastAPIResponse
 
 router = APIRouter(prefix="/orders", tags=["Órdenes"])
 
@@ -73,6 +75,41 @@ def _serialize(order: Order) -> OrderResponse:
         lines_picked=sum(1 for l in order.lines if l.status == OrderLineStatus.PICKED),
         lines_missing=sum(1 for l in order.lines if l.status == OrderLineStatus.MISSING),
     )
+
+
+@router.get("/export")
+async def export_orders_xlsx(
+    status: Optional[OrderStatus] = None,
+    start_date: Optional[datetime] = None,
+    end_date: Optional[datetime] = None,
+    db: AsyncSession = Depends(get_db),
+    _: Employee = Depends(require_role("MANAGER", "OFFICE")),
+):
+    """Download orders list filtered by status/date as XLSX."""
+    stmt = select(Order)
+    if status:
+        stmt = stmt.where(Order.status == status)
+    if start_date:
+        stmt = stmt.where(Order.created_at >= start_date)
+    if end_date:
+        stmt = stmt.where(Order.created_at <= end_date)
+    stmt = stmt.order_by(Order.created_at.desc())
+    result = await db.execute(stmt)
+    orders = result.scalars().all()
+    headers = ["Nº Orden", "Cliente", "Estado", "Nº líneas", "Creado", "Notas"]
+    rows = [
+        [
+            o.order_number, o.customer_name,
+            o.status.value if hasattr(o.status, "value") else o.status,
+            len(o.lines),
+            o.created_at.strftime("%Y-%m-%d %H:%M") if o.created_at else None,
+            o.notes,
+        ]
+        for o in orders
+    ]
+    content = build_xlsx("Órdenes", headers, rows)
+    return FastAPIResponse(content=content, media_type=XLSX_MEDIA,
+                           headers=xlsx_headers("ordenes.xlsx"))
 
 
 @router.get("", response_model=list[OrderResponse])

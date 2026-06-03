@@ -16,6 +16,7 @@ from app.schemas.product import (
 from app.auth import get_current_employee, require_role
 from app.services import stock_service
 from app.services.barcode_service import generate_label
+from app.services.excel_service import build_xlsx, XLSX_MEDIA, xlsx_headers
 
 router = APIRouter(prefix="/products", tags=["Productos"])
 
@@ -74,6 +75,32 @@ async def list_products(
     stmt = stmt.order_by(Product.name).limit(limit).offset(offset)
     result = await db.execute(stmt)
     return [ProductResponse.model_validate(_serialize(p)) for p in result.scalars().all()]
+
+
+@router.get("/export")
+async def export_products_xlsx(
+    db: AsyncSession = Depends(get_db),
+    _: Employee = Depends(require_role("MANAGER", "OFFICE")),
+):
+    """Download full active product catalog as XLSX."""
+    result = await db.execute(select(Product).where(Product.active.is_(True)).order_by(Product.name))
+    products = result.scalars().all()
+    headers = ["ID", "NIU", "Código barras", "Nombre", "Categoría", "Unidad",
+               "Stock mín.", "Stock actual", "Stock reservado", "Stock disponible",
+               "Coste (€)", "PVP base (€)", "Activo"]
+    rows = [
+        [
+            p.id, p.niu, p.barcode, p.name, p.category, p.unit,
+            p.min_stock, p.current_stock or 0,
+            p.reserved_stock or 0,
+            (p.current_stock or 0) - (p.reserved_stock or 0),
+            p.price_cost, p.price_base, "Sí" if p.active else "No",
+        ]
+        for p in products
+    ]
+    content = build_xlsx("Productos", headers, rows)
+    return FastAPIResponse(content=content, media_type=XLSX_MEDIA,
+                           headers=xlsx_headers("productos.xlsx"))
 
 
 @router.get("/low-stock")

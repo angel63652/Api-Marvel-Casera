@@ -38,3 +38,25 @@ def test_payroll_report_export_xlsx(client, auth):
 def test_export_requires_auth(client):
     assert client.get("/api/v1/trucks/schedules/history/export").status_code == 401
     assert client.get("/api/v1/employees/payrolls/report/2026/6/export").status_code == 401
+    assert client.get("/api/v1/products/export").status_code == 401
+    assert client.get("/api/v1/orders/export").status_code == 401
+
+
+def test_products_export_xlsx(client, auth):
+    # Seed one product
+    client.post("/api/v1/products", headers=auth, json={
+        "niu": "NIU-EXP-001", "barcode": "NIU-EXP-001",
+        "name": "Producto Exportación", "category": "TEST",
+        "unit": "unit", "min_stock": 1, "current_stock": 5,
+    })
+    r = client.get("/api/v1/products/export", headers=auth)
+    assert r.status_code == 200, r.text
+    assert "spreadsheetml" in r.headers["content-type"]
+    assert "attachment" in r.headers.get("content-disposition", "")
+    assert _is_valid_xlsx(r.content)
+
+
+def test_orders_export_xlsx(client, auth):
+    r = client.get("/api/v1/orders/export", headers=auth)
+    assert r.status_code == 200, r.text
+    assert _is_valid_xlsx(r.content)
