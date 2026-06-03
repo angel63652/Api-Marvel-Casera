@@ -280,6 +280,22 @@ En `portal.js` (mismo patrón que R8 pero con keys del portal):
 - **📌 Codex (frontend, opcional):** los botones "Exportar Excel" deben apuntar a esos endpoints (con el token).
 - **Opcionales restantes:** C10 (etiquetas barcode con Pillow); C4/C5 (Gmail/SMTP, requieren credenciales).
 
+### 2026-06-03 — C10 etiquetas barcode (HECHO) + fixes DELETE + más exports Excel
+- **C10**: `services/barcode_service.py` genera PNG 400×200 px con Code128 (python-barcode 0.16) +
+  Pillow. Endpoint `GET /api/v1/products/{id}/label` (auth empleado); si no tiene barcode usa NIU.
+  `python-barcode>=0.15.0` añadido a `requirements.txt`. 5 tests nuevos; 52 total.
+- **fix DELETE**: añadidos `DELETE /locations/{id}`, `DELETE /trucks/{id}` y `DELETE /employees/{id}`
+  (todos soft-delete, `is_active=False`; employees bloquea auto-desactivación; employees requiere ADMIN).
+  Resuelve el botón de eliminar en `locations.html` que Codex había reportado como BACKEND pendiente.
+- **Más exports Excel**: `GET /api/v1/products/export` (catálogo activo) y `GET /api/v1/orders/export`
+  (?status=&start_date=&end_date=), ambos MANAGER/OFFICE. 57 tests verdes.
+- **📌 Codex (C16):** para los nuevos botones de export:
+  - Productos: `GET /api/v1/products/export` (Bearer token en header, no querystring)
+  - Órdenes: `GET /api/v1/orders/export?status=COMPLETED` (filtra por estado/fecha)
+  - Camiones: `GET /api/v1/trucks/schedules/history/export`
+  - Nóminas: `GET /api/v1/employees/payrolls/report/{year}/{month}/export`
+  - Etiqueta barcode: `GET /api/v1/products/{id}/label` → PNG; útil en la tabla de productos.
+
 <!-- Codex: escribe aquí tus entradas, añadiendo al final de esta sección. -->
 
 ### 2026-06-02 — R6 cola offline picking + SW versionado
