@@ -184,3 +184,17 @@ async def unassign_product(
         raise HTTPException(status_code=404, detail="Asignación no encontrada")
     await db.delete(pl)
     return {"detail": "Producto desasignado de la ubicación"}
+
+
+@router.delete("/{location_id}", status_code=200)
+async def deactivate_location(
+    location_id: int,
+    db: AsyncSession = Depends(get_db),
+    _: Employee = Depends(require_role("MANAGER")),
+):
+    location = await db.get(Location, location_id)
+    if location is None:
+        raise HTTPException(status_code=404, detail="Ubicación no encontrada")
+    location.is_active = False
+    await db.flush()
+    return {"detail": "Ubicación desactivada", "id": location_id}
