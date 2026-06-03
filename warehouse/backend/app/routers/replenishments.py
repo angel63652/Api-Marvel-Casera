@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import Response as FastAPIResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Optional
@@ -22,6 +23,7 @@ from app.schemas.replenishment import (
 )
 from app.auth import require_role, get_current_employee
 from app.services import stock_service
+from app.services.excel_service import build_xlsx, XLSX_MEDIA, xlsx_headers
 
 router = APIRouter(prefix="/replenishments", tags=["Reposiciones"])
 
@@ -74,6 +76,37 @@ async def list_replenishments(
     stmt = stmt.order_by(Replenishment.created_at.desc())
     result = await db.execute(stmt)
     return [_serialize(r) for r in result.scalars().all()]
+
+
+@router.get("/export")
+async def export_replenishments_xlsx(
+    status: Optional[ReplenishmentStatus] = None,
+    db: AsyncSession = Depends(get_db),
+    _: Employee = Depends(require_role("MANAGER", "OFFICE")),
+):
+    """Download replenishments as XLSX."""
+    stmt = select(Replenishment)
+    if status:
+        stmt = stmt.where(Replenishment.status == status)
+    stmt = stmt.order_by(Replenishment.created_at.desc())
+    result = await db.execute(stmt)
+    reps = result.scalars().all()
+    headers = ["ID", "Estado", "Prioridad", "Creado", "Completado", "Nº líneas", "Notas"]
+    rows = [
+        [
+            r.id,
+            r.status.value if hasattr(r.status, "value") else r.status,
+            r.priority.value if hasattr(r.priority, "value") else r.priority,
+            r.created_at.strftime("%Y-%m-%d %H:%M") if r.created_at else None,
+            r.completed_at.strftime("%Y-%m-%d %H:%M") if r.completed_at else None,
+            len(r.lines),
+            r.notes,
+        ]
+        for r in reps
+    ]
+    content = build_xlsx("Reposiciones", headers, rows)
+    return FastAPIResponse(content=content, media_type=XLSX_MEDIA,
+                           headers=xlsx_headers("reposiciones.xlsx"))
 
 
 @router.get("/{replenishment_id}", response_model=ReplenishmentResponse)
@@ -216,3 +249,22 @@ async def receive_line(
     await db.flush()
     await db.refresh(rep)
     return _serialize(rep)
+
+
+@router.delete("/{replenishment_id}", status_code=200)
+async def cancel_replenishment(
+    replenishment_id: int,
+    db: AsyncSession = Depends(get_db),
+    _: Employee = Depends(require_role("MANAGER", "OFFICE")),
+):
+    rep = await db.get(Replenishment, replenishment_id)
+    if rep is None:
+        raise HTTPException(status_code=404, detail="Reposición no encontrada")
+    if rep.status == ReplenishmentStatus.COMPLETED:
+        raise HTTPException(status_code=409, detail="No se puede cancelar una reposición ya completada")
+    if rep.status == ReplenishmentStatus.CANCELLED:
+        return {"detail": "Reposición ya cancelada", "id": replenishment_id}
+    rep.status = ReplenishmentStatus.CANCELLED
+    rep.completed_at = datetime.now(timezone.utc)
+    await db.flush()
+    return {"detail": "Reposición cancelada", "id": replenishment_id}

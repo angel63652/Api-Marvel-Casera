@@ -1,3 +1,6 @@
+import io
+import zipfile
+
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from fastapi.responses import Response as FastAPIResponse
 from sqlalchemy import select, or_, func
@@ -101,6 +104,48 @@ async def export_products_xlsx(
     content = build_xlsx("Productos", headers, rows)
     return FastAPIResponse(content=content, media_type=XLSX_MEDIA,
                            headers=xlsx_headers("productos.xlsx"))
+
+
+@router.get("/labels")
+async def bulk_labels_zip(
+    ids: str = Query(..., description="Comma-separated product IDs"),
+    db: AsyncSession = Depends(get_db),
+    _: Employee = Depends(get_current_employee),
+):
+    """Return a ZIP containing one PNG label per requested product ID."""
+    try:
+        id_list = [int(i.strip()) for i in ids.split(",") if i.strip()]
+    except ValueError:
+        raise HTTPException(status_code=422, detail="ids must be comma-separated integers")
+    if not id_list:
+        raise HTTPException(status_code=422, detail="At least one product ID required")
+    if len(id_list) > 200:
+        raise HTTPException(status_code=422, detail="Maximum 200 labels per request")
+
+    result = await db.execute(select(Product).where(Product.id.in_(id_list)))
+    products = {p.id: p for p in result.scalars().all()}
+
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        for pid in id_list:
+            p = products.get(pid)
+            if p is None:
+                continue
+            barcode_val = p.barcode or p.niu
+            if not barcode_val:
+                continue
+            png = generate_label(barcode_val, p.name or "", p.niu or "")
+            zf.writestr(f"label_{pid}_{p.niu or pid}.png", png)
+
+    if buf.tell() == 0:
+        raise HTTPException(status_code=404, detail="None of the requested products were found")
+
+    buf.seek(0)
+    return FastAPIResponse(
+        content=buf.read(),
+        media_type="application/zip",
+        headers={"Content-Disposition": "attachment; filename=\"labels.zip\""},
+    )
 
 
 @router.get("/low-stock")
